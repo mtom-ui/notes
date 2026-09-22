@@ -52,8 +52,15 @@
   --sans:"Avenir Next",-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Helvetica,sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --ease:cubic-bezier(.32,.72,0,1);
-  --safe-t:env(safe-area-inset-top,0px);
-  --safe-b:env(safe-area-inset-bottom,0px);
+  /* Als Home-Bildschirm-App (display: standalone) meldet iOS diese Werte manchmal
+     unzuverlässig: oben zu klein (Inhalt rutscht unter die Statusleiste), unten zu
+     groß (unnötig viel Leerraum über der Home-Anzeige). Ein Mindestwert oben und ein
+     Höchstwert unten fangen beide Richtungen ab: die Statusleiste ist auf jedem
+     aktuellen iPhone mindestens 44pt hoch (Dynamic-Island-Geräte mehr, das bleibt
+     erhalten), die Home-Anzeige-Reserve ist auf jedem Gerät mit Home-Anzeige exakt
+     34pt (Geräte ohne Home-Anzeige melden echte 0, die bleiben ebenfalls erhalten). */
+  --safe-t:max(env(safe-area-inset-top,0px), 44px);
+  --safe-b:min(env(safe-area-inset-bottom,0px), 34px);
   --tab-h:62px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
