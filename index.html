@@ -106,7 +106,8 @@ input,textarea{font:inherit;color:inherit;background:none;border:none;outline:no
   transition:padding .2s var(--ease),box-shadow .2s;
 }
 .nav h1{margin:0;font-size:32px;font-weight:600;letter-spacing:-.02em;transition:font-size .18s var(--ease);}
-.nav .sub{font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.nav .sub{font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;white-space:nowrap;}
+.nav > div:first-child{min-width:0;}
 .nav.compact h1{font-size:20px;}
 .nav.compact{padding-bottom:10px;box-shadow:0 1px 0 var(--line);}
 .nav-actions{display:flex;gap:2px;align-items:center;}
@@ -337,6 +338,8 @@ body.kb #tabs{transform:translateY(130%);}
   font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
 }
 .ed-meta .mico{display:flex;flex:none;}
+.ed-meta .metalink span[onclick], .ed-meta .metalink > span:first-child, .ed-meta .metalink > span:last-child{cursor:pointer;}
+.ed-meta .metalink .over{color:var(--signal);}
 .ed-meta .mico svg{width:15px;height:15px;}
 #editor{
   flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
@@ -461,8 +464,9 @@ body.kb #tabs{transform:translateY(130%);}
   display:flex;align-items:center;justify-content:center;
 }
 .sheet-primary:active{opacity:.8;}
-.swatches{display:flex;gap:10px;padding:6px 8px 12px;}
-.swatch{flex:1;aspect-ratio:1.5;border-radius:14px;border:2px solid transparent;position:relative;overflow:hidden;}
+.swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:6px 8px 12px;}
+.swatch{aspect-ratio:1.25;border-radius:14px;border:2px solid transparent;position:relative;overflow:hidden;}
+.swatch b{position:absolute;left:8px;top:7px;font-size:10px;font-weight:600;letter-spacing:.06em;}
 .swatch.on{border-color:var(--accent);}
 .swatch i{position:absolute;right:8px;bottom:8px;width:14px;height:14px;border-radius:50%;}
 
@@ -514,8 +518,29 @@ function seed(){
 }
 let store;
 try{ store = JSON.parse(localStorage.getItem(KEY)) || seed(); }catch(e){ store = seed(); }
-store.folders ||= []; store.notes ||= []; store.trash ||= []; store.ui ||= {};
+store.folders ||= []; store.notes ||= []; store.trash ||= []; store.ui ||= {}; store.tickets ||= [];
 store.notes.forEach(n => { n.props ||= {}; });
+
+/* Tickets (seit 3.0.0): eigene Tabelle „tickets", nicht mehr Notizen mit props.type = "task".
+   Angelegt, geplant und als Serie erzeugt werden sie am Mac (notes.html) oder über Claude; hier
+   lassen sie sich lesen, abhaken, im Status ändern und bearbeiten. Solange ein Konto noch alte
+   Aufgaben-Notizen hat (Tabelle fehlt, Migration nicht gelaufen), erscheinen die weiter. */
+const isTicket = n => !!n && n.kind === "ticket";
+const tStatus = n => (isTicket(n) ? n.status : n.props.status) || "Offen";
+const tDue = n => (isTicket(n) ? n.due : n.props.due) || "";
+const tTags = n => isTicket(n) ? (n.tags || []) : (n.props.tag ? [n.props.tag] : []);
+function setTicketStatus(n, st){
+  if(isTicket(n)){
+    if(n.status !== st) n.activity = (n.activity || []).concat({ id: uid(), ts: Date.now(), type:"status", text: n.status + " → " + st, by:"user" }).slice(-300);
+    n.status = st; n.doneAt = st === "Erledigt" ? dayKey() : null;
+  }
+  else n.props.status = st;
+  n.updatedAt = Date.now(); n.editedBy = "user"; save();
+}
+function removeTicket(n){
+  if(isTicket(n)){ store.tickets = store.tickets.filter(x => x !== n); save(); }
+  else trashNote(n);
+}
 
 let saveT;
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){} }
@@ -554,6 +579,46 @@ function newNote(folderId){
   const n = {id:uid(), folderId: folderId || (store.folders[0]||{}).id || null,
              createdAt:Date.now(), updatedAt:Date.now(), text:"", props:{}};
   store.notes.unshift(n); save(); return n;
+}
+/* Tickets lassen sich auch unterwegs anlegen — gleiche Form wie am Desktop (newTicket in notes.html). */
+function newTicket(){
+  const now = Date.now();
+  const t = { kind:"ticket", id:uid(), text:"", status:"Offen", due:"", tags:[], seriesId:null, subtasks:[], updates:[],
+              activity:[{ id:uid(), ts:now, type:"created", text:"", by:"user" }], doneAt:null,
+              createdAt:now, updatedAt:now, editedBy:"user" };
+  store.tickets.unshift(t); save(); return t;
+}
+const fmtDueLong = k => k ? k.split("-").reverse().join(".") : "ohne Termin";
+function setTicketDue(n, due){
+  if((n.due || "") === (due || "")) return;
+  n.activity = (n.activity || []).concat({ id:uid(), ts:Date.now(), type:"due", text: fmtDueLong(n.due) + " → " + fmtDueLong(due), by:"user" }).slice(-300);
+  n.due = due || ""; n.updatedAt = Date.now(); n.editedBy = "user"; save();
+}
+function dueSheet(n, after){
+  const today = dayKey(), d = new Date(), toMon = ((8 - d.getDay()) % 7) || 7;
+  const pick = k => { setTicketDue(n, k); after && after(); toast(k ? "Fällig " + fmtDay(k) : "Ohne Termin"); };
+  const input = el("input",{type:"date", class:"sheet-input", value: n.due || ""});
+  input.addEventListener("change", ()=>{ if(input.value){ closeSheet(); pick(input.value); } });
+  sheet({title:"Termin", items:[
+    {label:"Heute", value:fmtDay(today), onTap:()=>pick(today)},
+    {label:"Morgen", value:fmtDay(shiftDay(today,1)), onTap:()=>pick(shiftDay(today,1))},
+    {label:"Nächster Montag", value:fmtDay(shiftDay(today,toMon)), onTap:()=>pick(shiftDay(today,toMon))},
+    {label:"In einer Woche", value:fmtDay(shiftDay(today,7)), onTap:()=>pick(shiftDay(today,7))},
+    {custom: input},
+    n.due ? {label:"Ohne Termin", danger:true, onTap:()=>pick("")} : null
+  ].filter(Boolean)});
+}
+function tagSheet(n, after){
+  const items = [];
+  TAG_GROUPS.forEach(g => g.tags.forEach(tag => items.push({
+    label: tag.toUpperCase(), value: g.name, icon: (n.tags||[]).includes(tag) ? I.check : null,
+    onTap: ()=>{
+      const has = (n.tags||[]).includes(tag);
+      n.tags = has ? n.tags.filter(x => x !== tag) : (n.tags||[]).concat(tag);
+      n.updatedAt = Date.now(); n.editedBy = "user"; save(); after && after();
+    }
+  })));
+  sheet({title:"Kürzel", items});
 }
 function trashNote(n){
   store.notes = store.notes.filter(x=>x.id!==n.id);
@@ -697,21 +762,71 @@ async function pushChanges(){
     }
     notes.forEach(n => known["n:"+n.id] = n.updatedAt || 1);
   }
-  const noteIds = new Set(store.notes.map(n=>n.id)), folderIds = new Set(store.folders.map(f=>f.id));
+  if(!sync.noTickets){
+    const tickets = store.tickets.filter(t => (known["t:"+t.id] || 0) < (t.updatedAt || 1));
+    if(tickets.length){
+      const post = rows => apiFetch("/rest/v1/tickets?on_conflict=user_id,id", { method:"POST", headers:{ "Prefer":"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows) });
+      const rows = tickets.map(ticketRow);
+      try{
+        try{ await post(rows); }
+        catch(e){
+          // the "activity" column (ticket history) came later; until schema.sql is re-run, sync without it
+          if(!/activity/i.test(e.message)) throw e;
+          rows.forEach(r => delete r.activity);
+          await post(rows);
+        }
+        tickets.forEach(t => known["t:"+t.id] = t.updatedAt || 1);
+      }catch(e){ if(!isMissingTable(e)) throw e; sync.noTickets = true; }
+    }
+  }
+  const live = { n: new Set(store.notes.map(n=>n.id)), f: new Set(store.folders.map(f=>f.id)), t: new Set(store.tickets.map(t=>t.id)) };
+  const tables = { n:"notes", f:"folders", t:"tickets" };
   for(const key of Object.keys(known)){
-    const id = key.slice(2), isNote = key.startsWith("n:");
-    if(isNote ? noteIds.has(id) : folderIds.has(id)) continue;
-    await apiFetch("/rest/v1/" + (isNote ? "notes" : "folders") + "?id=eq." + encodeURIComponent(id), { method:"PATCH",
+    const kind = key[0], id = key.slice(2);
+    if(!tables[kind] || live[kind].has(id) || (kind === "t" && sync.noTickets)) continue;
+    await apiFetch("/rest/v1/" + tables[kind] + "?id=eq." + encodeURIComponent(id), { method:"PATCH",
       headers:{ "Prefer":"return=minimal" }, body: JSON.stringify({ deleted_at: now, updated_at: now }) });
     delete known[key];
   }
   saveSyncState();
 }
+function isMissingTable(e){ return /^404|PGRST20[45]|schema cache|does not exist/i.test(e.message || ""); }
+function ticketDescription(t){ let rest = t.text.split("\n").slice(1); if(rest[0] === "") rest = rest.slice(1); return rest.join("\n"); }
+function ticketRow(t){
+  return { id:t.id, title: titleOf(t), description: ticketDescription(t), status: t.status, due: t.due || null, tags: t.tags || [],
+           series_id: t.seriesId || null, subtasks: t.subtasks || [], updates: t.updates || [], activity: t.activity || [], created_at: t.createdAt || Date.now(),
+           updated_at: t.updatedAt || 1, done_at: t.doneAt || null, deleted_at: null, source: t.source || null, edited_by: t.editedBy || null };
+}
+function ticketFromRow(r){
+  return { kind:"ticket", id:r.id, text:(r.title || "") + "\n\n" + (r.description || ""), status: r.status || "Offen", due: r.due || "",
+           tags: Array.isArray(r.tags) ? r.tags : [], seriesId: r.series_id || null, subtasks: Array.isArray(r.subtasks) ? r.subtasks : [],
+           updates: Array.isArray(r.updates) ? r.updates : [], activity: Array.isArray(r.activity) ? r.activity : [],
+           doneAt: r.done_at || null, createdAt: r.created_at, updatedAt: r.updated_at,
+           source: r.source || undefined, editedBy: r.edited_by || undefined };
+}
 async function pullChanges(){
   const since = sync.state.lastPull, known = sync.state.known;
   const q = "?select=*&updated_at=gt." + since + "&order=updated_at.asc";
   const [folders, notes] = await Promise.all([ apiFetch("/rest/v1/folders" + q), apiFetch("/rest/v1/notes" + q) ]);
-  let maxTs = since, changed = false, currentChanged = false;
+  const sinceT = sync.state.lastPullTickets || 0;
+  let tickets = [];
+  try{ tickets = await apiFetch("/rest/v1/tickets?select=*&updated_at=gt." + sinceT + "&order=updated_at.asc"); sync.noTickets = false; }
+  catch(e){ if(!isMissingTable(e)) throw e; sync.noTickets = true; }
+  let maxTs = since, maxT = sinceT, changed = false, currentChanged = false;
+  tickets.forEach(r=>{
+    maxT = Math.max(maxT, r.updated_at);
+    const local = store.tickets.find(t=>t.id===r.id);
+    if(r.deleted_at){
+      if(local && (local.updatedAt||0) <= r.updated_at){ store.tickets = store.tickets.filter(t=>t!==local); delete known["t:"+r.id]; changed = true; if(edNote === local) edNote = null; }
+      return;
+    }
+    if(!local) store.tickets.push(ticketFromRow(r));
+    else if((local.updatedAt||0) < r.updated_at){ Object.assign(local, ticketFromRow(r)); if(local === edNote) currentChanged = true; }
+    else return;
+    changed = true;
+    known["t:"+r.id] = r.updated_at;
+  });
+  if(!sync.noTickets) sync.state.lastPullTickets = maxT;
   folders.forEach(r=>{
     maxTs = Math.max(maxTs, r.updated_at);
     const local = store.folders.find(f=>f.id===r.id);
@@ -748,7 +863,7 @@ async function pullChanges(){
   if(!changed) return;
   persist();
   if(edNote){
-    if(!store.notes.some(n=>n.id===edNote.id)) pop();
+    if(!store.notes.some(n=>n.id===edNote.id) && !store.tickets.includes(edNote)) pop();
     else if(currentChanged && Date.now() - lastEditAt > 3000){
       const off = Math.min(getCaretOffset(edEl), edNote.text.length);
       edPrev = [];
@@ -922,7 +1037,7 @@ function confirmSheet(title, label, onOk){
 const tabviews = { aufgaben:document.getElementById("tab-aufgaben"),
                    notizen:document.getElementById("tab-notizen") };
 const TABS = [
-  {id:"aufgaben", label:"Aufgaben", icon:I.check2},
+  {id:"aufgaben", label:"Tickets", icon:I.check2},
   {id:"notizen", label:"Notizen", icon:I.notes}
 ];
 const tabbar = document.getElementById("tabs");
@@ -930,9 +1045,9 @@ const tabbar = document.getElementById("tabs");
    die vier Tabs verteilen sich links und rechts davon. */
 TABS.forEach((t, i) => {
   if(i === 1){
-    tabbar.appendChild(el("button",{class:"plus", "aria-label":"Neue Notiz", onclick:()=>{
+    tabbar.appendChild(el("button",{class:"plus", "aria-label":"Neu", onclick:()=>{
       if(navigator.vibrate) navigator.vibrate(8);
-      openNote(newNote());
+      openNote(curTab === "aufgaben" ? newTicket() : newNote());   // im Tickets-Tab ein Ticket, sonst eine Notiz
     }}, [el("span",{html:I.plus})]));
   }
   tabbar.appendChild(el("button",{class:"", "data-tab":t.id, onclick:()=>showTab(t.id)},
@@ -1025,7 +1140,7 @@ const ZWS = "\u200b";
 const cleanText = s => s.replace(/\u200b/g, "");
 const escapeHtml = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const TAG_RE = /(^|[\s(])#([\p{L}_][\p{L}\p{N}_\-\/]*)/gu;
-const findNoteByTitle = t => store.notes.find(n => titleOf(n).toLowerCase() === String(t).trim().toLowerCase());
+const findNoteByTitle = t => { const w = String(t).trim().toLowerCase(); return store.notes.find(n => titleOf(n).toLowerCase() === w) || store.tickets.find(n => titleOf(n).toLowerCase() === w); };
 
 function renderInline(raw){
   let t = escapeHtml(raw);
@@ -1341,13 +1456,20 @@ function openNote(note){
                          "data-placeholder":"Titel – dann Enter und losschreiben…"});
     edEl = ed; edNote = note; edPrev = [];
 
-    const noteStatus = () => note.props.status || "Offen";
+    const noteStatus = () => tStatus(note);
     /* Kategorie-Zeile unter dem Titel: Symbol + Ordnername in Versalien,
        dahinter der Status als Pille (wie in der Vorlage). */
     function drawMeta(){
       meta.innerHTML = "";
-      meta.appendChild(el("span",{class:"mico",html:I.folder}));
-      meta.appendChild(el("span",{text:folderName(note.folderId)}));
+      meta.appendChild(el("span",{class:"mico",html: isTicket(note) ? I.check2 : I.folder}));
+      meta.appendChild(isTicket(note)
+        ? el("span",{class:"metalink"},[
+            el("span",{text:(tTags(note).join(" · ").toUpperCase() || "+ Kürzel"), onclick:()=>tagSheet(note, drawMeta)}),
+            el("span",{text:" · "}),
+            el("span",{class: tDue(note) && tDue(note) < dayKey() && tStatus(note) !== "Erledigt" ? "over" : "",
+                        text: tDue(note) ? "fällig " + fmtDay(tDue(note)) : "+ Termin", onclick:()=>dueSheet(note, drawMeta)})
+          ])
+        : el("span",{text: folderName(note.folderId)}));
       meta.appendChild(el("span",{class:"badge",text:noteStatus(),onclick:statusSheet,
         style:"margin-left:auto"}));
     }
@@ -1355,21 +1477,27 @@ function openNote(note){
     function statusSheet(){
       sheet({title:"Status", items:STATUSES.map(k=>({
         label:k, icon: noteStatus()===k ? I.check : I.board,
-        onTap:()=>{ note.props.status = k; note.updatedAt = Date.now(); save(); drawMeta(); toast("Status: "+k); }
+        onTap:()=>{ setTicketStatus(note, k); drawMeta(); toast("Status: "+k); }
       }))});
     }
 
-    nav.querySelector(".title").textContent = "Notiz";
+    nav.querySelector(".title").textContent = isTicket(note) ? "Ticket" : "Notiz";
     nav.querySelector(".back span:last-child").textContent = "Fertig";
     nav.lastChild.replaceWith(el("div",{style:"display:flex;gap:2px"},[
       el("button",{class:"iconbtn",html:I.more,onclick:()=>sheet({items:[
         {label:"Status ändern", icon:I.board, onTap:statusSheet},
-        {label:"In Ordner verschieben", icon:I.move, onTap:()=>moveSheet(note, drawMeta)},
+        isTicket(note) ? {label:"Termin", icon:I.check2, value: note.due ? fmtDay(note.due) : "keiner", onTap:()=>dueSheet(note, drawMeta)} : null,
+        isTicket(note) ? {label:"Kürzel", icon:I.case, value: (note.tags||[]).join(" · ").toUpperCase() || "keins", onTap:()=>tagSheet(note, drawMeta)} : null,
+        isTicket(note) ? null : {label:"In Ordner verschieben", icon:I.move, onTap:()=>moveSheet(note, drawMeta)},
         {label:"Als Text teilen", icon:I.share, onTap:()=>shareNote(note)},
-        {label:"In den Papierkorb", icon:I.trash, danger:true, onTap:()=>{
-          confirmSheet("Notiz löschen?","Löschen",()=>{ trashNote(note); pop(); toast("In den Papierkorb"); });
-        }}
-      ]})})
+        isTicket(note)
+          ? {label:"Ticket löschen", icon:I.trash, danger:true, onTap:()=>{
+              confirmSheet("Ticket löschen?","Löschen",()=>{ removeTicket(note); pop(); toast("Ticket gelöscht"); });
+            }}
+          : {label:"In den Papierkorb", icon:I.trash, danger:true, onTap:()=>{
+              confirmSheet("Notiz löschen?","Löschen",()=>{ trashNote(note); pop(); toast("In den Papierkorb"); });
+            }}
+      ].filter(Boolean)})})
     ]));
 
     drawMeta();
@@ -1465,6 +1593,14 @@ function openNote(note){
     ref.cleanup = ()=>{
       document.removeEventListener("selectionchange", onSel);
       if(edEl === ed){ edEl = null; edNote = null; edOnChange = null; }
+      // „+" getippt und ohne Eingabe wieder zu: nichts zurücklassen (der Sync räumt schon Hochgeladenes mit ab)
+      const untouched = !String(note.text || "").trim() &&
+        (!isTicket(note) || (!note.due && !(note.tags||[]).length && !(note.subtasks||[]).length));
+      if(untouched){
+        if(isTicket(note)) store.tickets = store.tickets.filter(x => x !== note);
+        else store.notes = store.notes.filter(x => x !== note);
+        save();
+      }
     };
     return null;
   }, {title:"", onPop:()=>ref.cleanup && ref.cleanup()});
@@ -1486,11 +1622,10 @@ async function shareNote(note){
   catch(e){ toast("Teilen nicht verfügbar"); }
 }
 
-/* ========================= 7. Tab: Aufgaben =========================
-   Zeigt die Aufgaben-Notizen (props.type === "task", angelegt am Mac oder über
-   Claude) nach Fälligkeitstag gruppiert. Dasselbe Datenmodell wie die Desktop-
-   Version: props.due (YYYY-MM-DD), props.status aus STATUSES, props.tag als
-   Kürzel, das über TAG_GROUPS zu einer Gruppe gehört. */
+/* ========================= 7. Tab: Tickets =========================
+   Zeigt die Tickets (Tabelle „tickets", angelegt am Mac oder über Claude) nach
+   Fälligkeitstag gruppiert — plus alte Aufgaben-Notizen, solange es sie noch gibt.
+   Kürzel (mehrere möglich) gehören über TAG_GROUPS zu einer Gruppe. */
 const STATUSES = ["Offen", "In Arbeit", "Blockiert", "Erledigt"];
 const TAG_GROUPS = [
   { id:"myo",           name:"MYO",           tags:["sls","fin","mkt","ops","sf","bizdev","prod","andere"] },
@@ -1499,6 +1634,12 @@ const TAG_GROUPS = [
 ];
 const isTask = n => !!(n && n.props && n.props.type === "task");
 const groupOfTag = tag => TAG_GROUPS.find(g => g.tags.includes(String(tag||"").toLowerCase())) || null;
+const groupOfTicket = n => tTags(n).map(groupOfTag).find(Boolean) || null;
+const inTicketGroup = (n, gid) => tTags(n).some(k => (groupOfTag(k)||{}).id === gid);
+function allTickets(){
+  const ids = new Set(store.tickets.map(t => t.id));
+  return store.tickets.concat(store.notes.filter(n => isTask(n) && !ids.has(n.id)));
+}
 function dayKey(d){
   d = d || new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
@@ -1532,7 +1673,7 @@ renderers.aufgaben = function(){
   const nav = el("div",{class:"nav"},[
     el("div",{},[
       el("div",{class:"sub",text:new Date().toLocaleDateString("de-DE",{weekday:"long", day:"numeric", month:"long"})}),
-      el("h1",{text:"Aufgaben"})
+      el("h1",{text:"Tickets"})
     ]),
     el("div",{class:"nav-actions"},[
       el("button",{class:"iconbtn",html:I.search,onclick:openSearch}),
@@ -1542,15 +1683,15 @@ renderers.aufgaben = function(){
     ])
   ]);
 
-  const all = store.notes.filter(isTask);
-  const visible = all.filter(n => showDone || n.props.status !== "Erledigt")
-                     .filter(n => !taskGroup || (groupOfTag(n.props.tag)||{}).id === taskGroup);
+  const all = allTickets();
+  const visible = all.filter(n => showDone || tStatus(n) !== "Erledigt")
+                     .filter(n => !taskGroup || inTicketGroup(n, taskGroup));
 
   /* Filterleiste: Gruppen als Reiter, mit Anzahl */
   const counts = {};
   TAG_GROUPS.forEach(g => counts[g.id] = all.filter(n =>
-    (showDone || n.props.status !== "Erledigt") && (groupOfTag(n.props.tag)||{}).id === g.id).length);
-  const openAll = all.filter(n => showDone || n.props.status !== "Erledigt").length;
+    (showDone || tStatus(n) !== "Erledigt") && inTicketGroup(n, g.id)).length);
+  const openAll = all.filter(n => showDone || tStatus(n) !== "Erledigt").length;
   const seg = el("div",{class:"seg"});
   [{id:"", name:"Alle", n:openAll}].concat(TAG_GROUPS.map(g=>({id:g.id, name:g.name, n:counts[g.id]})))
     .forEach(g => seg.appendChild(el("button",{class: taskGroup===g.id ? "on":"", onclick:()=>{ taskGroup = g.id; renderers.aufgaben(); }},
@@ -1562,20 +1703,20 @@ renderers.aufgaben = function(){
   /* Nach Tagen bündeln: überfällige Tage zuerst, dann heute und die Zukunft,
      ganz am Ende die Aufgaben ohne Termin. */
   const buckets = {};
-  visible.forEach(n => { const k = n.props.due || "none"; (buckets[k] = buckets[k] || []).push(n); });
+  visible.forEach(n => { const k = tDue(n) || "none"; (buckets[k] = buckets[k] || []).push(n); });
   const keys = Object.keys(buckets).filter(k => k !== "none").sort();
   if(buckets.none) keys.push("none");
 
   if(!keys.length){
     if(!all.length && !syncEnabled()){
       sc.appendChild(el("div",{class:"section"},[el("div",{class:"hintbox"},[
-        el("div",{class:"txt",text:"Dieses Gerät ist noch nicht mit deinem Konto verbunden — deshalb sind hier keine Aufgaben vom Mac zu sehen."}),
+        el("div",{class:"txt",text:"Dieses Gerät ist noch nicht mit deinem Konto verbunden — deshalb sind hier keine Tickets vom Mac zu sehen."}),
         el("button",{text:"Konto verbinden",onclick:openAccount})
       ])]));
       return;
     }
     sc.appendChild(el("div",{class:"section"},[el("div",{class:"group"},[
-      el("div",{class:"empty",text: all.length ? "In dieser Gruppe ist nichts offen." : "Noch keine Aufgaben. Am Mac oder über Claude anlegen."})])]));
+      el("div",{class:"empty",text: all.length ? "In dieser Gruppe ist nichts offen." : "Noch keine Tickets. Am Mac oder über Claude anlegen."})])]));
     return;
   }
   /* Alle überfälligen Tage laufen unter einer gemeinsamen Überschrift. */
@@ -1605,18 +1746,18 @@ function daySection(title, sub, notes){
    „Fällig"/„Kategorie" und der Status mit Fortschritt der Unteraufgaben. */
 function taskNoteRow(n, refresh){
   const wrap = el("div",{class:"rowwrap"});
-  const done = n.props.status === "Erledigt";
-  const subs = allTasks().filter(t=>t.noteId===n.id);
+  const done = tStatus(n) === "Erledigt";
+  const subs = isTicket(n) ? (n.subtasks || []) : allTasks().filter(t=>t.noteId===n.id);
   const subsDone = subs.filter(t=>t.done).length;
-  const overdue = n.props.due && n.props.due < dayKey() && !done;
-  const group = groupOfTag(n.props.tag);
+  const due = tDue(n);
+  const overdue = due && due < dayKey() && !done;
+  const group = groupOfTicket(n);
 
   const row = el("div",{class:"row"+(done?" done":"")},[
     el("div",{class:"head"},[
       el("div",{class:"circle",html:I.check,onclick:e=>{
         e.stopPropagation();
-        n.props.status = done ? "Offen" : "Erledigt";
-        n.updatedAt = Date.now(); save();
+        setTicketStatus(n, done ? "Offen" : "Erledigt");
         if(navigator.vibrate) navigator.vibrate(8);
         row.classList.toggle("done");
         setTimeout(()=>refresh && refresh(), 260);
@@ -1628,15 +1769,15 @@ function taskNoteRow(n, refresh){
     el("div",{class:"fields"},[
       el("div",{class:"fld"},[
         el("div",{class:"lbl",text:"Fällig"}),
-        el("div",{class:"v mono"+(overdue?" due":""),text: n.props.due ? fmtDay(n.props.due) : "—"})
+        el("div",{class:"v mono"+(overdue?" due":""),text: due ? fmtDay(due) : "—"})
       ]),
       el("div",{class:"fld",style:"flex:1;min-width:0"},[
-        el("div",{class:"lbl",text:"Kategorie"}),
-        el("div",{class:"v",text: (n.props.tag || "").toUpperCase() || folderName(n.folderId)})
+        el("div",{class:"lbl",text:"Kürzel"}),
+        el("div",{class:"v",text: tTags(n).join(" · ").toUpperCase() || "—"})
       ])
     ]),
     el("div",{class:"meterrow"},[
-      el("span",{class:"lbl",text: n.props.status || "Offen"}),
+      el("span",{class:"lbl",text: tStatus(n)}),
       el("span",{class:"meter"},[el("i",{style:"width:"+Math.round((subs.length ? subsDone/subs.length : (done?1:.06))*100)+"%"})]),
       subs.length ? el("span",{class:"cnt",text:subsDone+"/"+subs.length+" erledigt"}) : null
     ])
@@ -1645,7 +1786,7 @@ function taskNoteRow(n, refresh){
   row.addEventListener("touchstart", ()=>row.classList.add("pressed"), {passive:true});
   ["touchend","touchmove","touchcancel"].forEach(ev=>row.addEventListener(ev, ()=>row.classList.remove("pressed"), {passive:true}));
   wrap.appendChild(row);
-  swipeRow(wrap, row, ()=>{ trashNote(n); toast("In den Papierkorb"); refresh && refresh(); });
+  swipeRow(wrap, row, ()=>{ removeTicket(n); toast(isTicket(n) ? "Ticket gelöscht" : "In den Papierkorb"); refresh && refresh(); });
   return wrap;
 }
 
@@ -1816,7 +1957,7 @@ function openList(title, notes){
 let searchQ = "";
 function openSearch(){
   push((scr, nav)=>{
-    const input = el("input",{id:"q", type:"search", placeholder:"Notizen, Aufgaben, Tags…", autocomplete:"off", value:searchQ});
+    const input = el("input",{id:"q", type:"search", placeholder:"Notizen, Tickets, Tags…", autocomplete:"off", value:searchQ});
     const bar = el("div",{class:"searchbar"},[
       el("div",{class:"field"},[el("span",{html:I.search}), input])
     ]);
@@ -1841,8 +1982,15 @@ function drawResults(sc){
       sectionHead("Zuletzt", "bearbeitet"), g]));
     return;
   }
-  const notes = store.notes.filter(n=>n.text.toLowerCase().includes(q)).sort(byRecent);
+  const notes = store.notes.filter(n=>!isTask(n) && n.text.toLowerCase().includes(q)).sort(byRecent);
+  const tickets = allTickets().filter(n=>n.text.toLowerCase().includes(q) || tTags(n).includes(q.replace(/^#/, ""))).sort(byRecent);
   const tasks = allTasks().filter(t=>t.text.toLowerCase().includes(q));
+  if(tickets.length){
+    const g = el("div",{class:"group"});
+    tickets.slice(0,20).forEach(n=>g.appendChild(taskNoteRow(n, ()=>drawResults(sc))));
+    sc.appendChild(el("div",{class:"section",style:"padding-top:6px"},[
+      sectionHead("Tickets", tickets.length + " Treffer"), g]));
+  }
   if(notes.length){
     const g = el("div",{class:"group"});
     notes.forEach(n=>g.appendChild(noteRow(n, ()=>drawResults(sc))));
@@ -1855,7 +2003,7 @@ function drawResults(sc){
     sc.appendChild(el("div",{class:"section"},[
       sectionHead("Aufgaben", tasks.length + " Treffer"), g]));
   }
-  if(!notes.length && !tasks.length){
+  if(!notes.length && !tasks.length && !tickets.length){
     sc.appendChild(el("div",{class:"section"},[el("div",{class:"group"},[
       el("div",{class:"empty",text:'Nichts zu „'+searchQ+'" gefunden.'})])]));
     sc.appendChild(el("div",{class:"section"},[el("button",{class:"sheet-primary",text:"Notiz anlegen",onclick:()=>{
@@ -1866,11 +2014,22 @@ function drawResults(sc){
 
 
 /* ========================= 11. Einstellungen ========================= */
+/* Dieselben Paletten wie am Desktop (notes.html, THEMES) — gleiche Rohfarben, gleiche
+   Ableitung der gedämpften Töne, damit beide Apps bei gleicher Wahl gleich aussehen. */
 const THEMES = {
-  fern:  {bg:"#2b4a3b",surface:"#315443",s2:"#3a6150",line:"#3f6553",text:"#eaf1e4",muted:"#93ad9b",faint:"#6d8a78",accent:"#dcee8a",ink:"#22392f"},
-  nacht: {bg:"#16181d",surface:"#1f2229",s2:"#282c35",line:"#333844",text:"#e7e9ee",muted:"#9aa0ad",faint:"#666d7b",accent:"#b9c6ff",ink:"#16181d"},
-  papier:{bg:"#f6f3ec",surface:"#ffffff",s2:"#efeadf",line:"#e2dcd0",text:"#23211d",muted:"#6f6a61",faint:"#a09a8e",accent:"#3f6f4f",ink:"#ffffff"}
+  graphit:  {name:"Graphit",   bg:"#1a1917", surface:"#282520", line:"#3e382f", text:"#f3eada", accent:"#ff7a18", signal:"#ff3b5c"},
+  fern:     {name:"Fern",      bg:"#254036", surface:"#2e4c40", line:"#3c5c4e", text:"#e4eedc", accent:"#dcee8a", signal:"#ff7a5a"},
+  nacht:    {name:"Nacht",     bg:"#16181d", surface:"#1f2229", line:"#333844", text:"#e7e9ee", accent:"#b9c6ff", signal:"#ff6b6b"},
+  salbei:   {name:"Salbei",    bg:"#d6e8d4", surface:"#edf5eb", line:"#aecbaa", text:"#243b26", accent:"#2e7d57", signal:"#c62d24"},
+  flieder:  {name:"Flieder",   bg:"#e3d4ff", surface:"#f2eaff", line:"#c1a4f2", text:"#231145", accent:"#6a1bd1", signal:"#d11a3c"},
+  mandarine:{name:"Mandarine", bg:"#fbdfc7", surface:"#fef0e5", line:"#efc19b", text:"#4a2a10", accent:"#1f4499", signal:"#d93a12"},
+  sonne:    {name:"Sonne",     bg:"#fbebb5", surface:"#fef6df", line:"#e6d08a", text:"#3a2f0b", accent:"#2e4bc4", signal:"#c4271e"},
+  papier:   {name:"Papier",    bg:"#f6f3ec", surface:"#ffffff", line:"#e2dcd0", text:"#23211d", accent:"#3f6f4f", signal:"#c4382a"}
 };
+function relLum(hex){
+  const c = [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=> v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4));
+  return 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
+}
 /* Dasselbe Stapel-Symbol wie die Desktop-App: drei versetzte Quadrate in drei
    Abstufungen der Akzentfarbe, zur Laufzeit aus dem aktiven Theme gebaut. */
 function mixHex(a, b, amount){
@@ -1890,13 +2049,19 @@ function applyTheme(name){
   const t = THEMES[name] || THEMES.fern, r = document.documentElement.style;
   const link = document.getElementById("app-favicon");
   if(link) link.setAttribute("href", "data:image/svg+xml," + encodeURIComponent(stackIconSVG(t)));
-  r.setProperty("--bg",t.bg); r.setProperty("--surface",t.surface); r.setProperty("--surface-2",t.s2);
-  r.setProperty("--line",t.line); r.setProperty("--text",t.text); r.setProperty("--muted",t.muted);
-  r.setProperty("--faint",t.faint); r.setProperty("--accent",t.accent); r.setProperty("--accent-ink",t.ink);
+  const dark = relLum(t.text) > relLum(t.bg);
+  const ink = relLum(t.accent) > 0.35 ? (dark ? t.bg : t.text) : "#ffffff";
+  r.setProperty("--bg",t.bg); r.setProperty("--surface",t.surface);
+  r.setProperty("--surface-2",mixHex(t.surface, t.text, dark ? 0.07 : 0.04));
+  r.setProperty("--line",t.line); r.setProperty("--text",t.text);
+  r.setProperty("--muted",mixHex(t.text, t.bg, dark ? 0.48 : 0.38));
+  r.setProperty("--faint",mixHex(t.text, t.bg, dark ? 0.68 : 0.54));
+  r.setProperty("--accent",t.accent); r.setProperty("--accent-ink",ink); r.setProperty("--signal",t.signal);
+  document.documentElement.style.colorScheme = dark ? "dark" : "light";
   const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.content = t.bg;
   store.ui.theme = name; save();
 }
-applyTheme(store.ui.theme || "fern");
+applyTheme(THEMES[store.ui.theme] ? store.ui.theme : "fern");
 
 function settingsSheet(){
   const sw = el("div",{class:"swatches"});
@@ -1904,7 +2069,7 @@ function settingsSheet(){
     const t = THEMES[k];
     const b = el("div",{class:"swatch"+(store.ui.theme===k?" on":""), style:"background:"+t.bg,
       onclick:()=>{ applyTheme(k); sw.querySelectorAll(".swatch").forEach(x=>x.classList.remove("on")); b.classList.add("on"); }},
-      [el("i",{style:"background:"+t.accent})]);
+      [el("b",{text:t.name,style:"color:"+t.text}), el("i",{style:"background:"+t.accent})]);
     sw.appendChild(b);
   });
   sheet({title:"Einstellungen", items:[
