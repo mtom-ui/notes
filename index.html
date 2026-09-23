@@ -364,7 +364,7 @@ body.kb #tabs{transform:translateY(130%);}
 .line-h2.line-title,.line-h3.line-title{border-top:none;margin-top:0;padding-top:0;}
 .line-h1 .marker{color:var(--accent);opacity:.55;font-weight:600;}
 .line-h2 .marker,.line-h3 .marker,.line-h4 .marker{color:var(--accent);opacity:.6;}
-.line-quote{color:var(--muted);font-style:italic;box-shadow:inset 3px 0 0 var(--line);padding-left:12px;}
+.line-quote{display:inline-block;width:100%;box-sizing:border-box;vertical-align:top;color:var(--muted);font-style:italic;border-left:3px solid var(--faint);padding-left:14px;}
 .line-hr{display:inline-block;width:100%;color:transparent;background:linear-gradient(var(--line),var(--line)) center / 100% 1px no-repeat;}
 .line-code-fence{color:var(--faint);font-family:var(--mono);font-size:14.5px;}
 .line-code{font-family:var(--mono);font-size:14.5px;background:rgba(127,127,127,.14);
@@ -1177,7 +1177,7 @@ function renderLine(raw, idx, state){
   if((m = /^(#{1,6})(\s+)(.*)$/.exec(raw)))
     return '<span class="line line-h'+m[1].length+titleClass+'" data-line="'+idx+'"><span class="marker marker-hide">'+escapeHtml(m[1]+m[2])+'</span>'+renderInline(m[3])+'</span>';
   if((m = /^>(\s?)(.*)$/.exec(raw)))
-    return '<span class="line line-quote'+titleClass+'" data-line="'+idx+'"><span class="marker">'+escapeHtml(">"+m[1])+'</span>'+renderInline(m[2])+'</span>';
+    return '<span class="line line-quote'+titleClass+'" data-line="'+idx+'"><span class="marker marker-hide">'+escapeHtml(">"+m[1])+'</span>'+renderInline(m[2])+'</span>';
   if((m = /^(\s*[-*]\s)\[([ xX])\](\s.*)$/.exec(raw))){
     const checked = m[2].toLowerCase() === "x";
     return '<span class="line line-list line-checkbox'+(checked?" checked":"")+titleClass+'" data-line="'+idx+'"><span class="marker">'+escapeHtml(m[1])+'</span><span class="md-checkbox" data-line="'+idx+'">'+escapeHtml("["+m[2]+"]")+'</span>'+renderInline(m[3])+'</span>';
