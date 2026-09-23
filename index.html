@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.2.3">
+<meta name="app-version" content="3.2.4">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -102,7 +102,7 @@ input,textarea{font:inherit;color:inherit;background:none;border:none;outline:no
 
 /* ---------- Kopfbereich ---------- */
 .nav{
-  flex:none;padding:calc(var(--safe-t) + 10px) 18px 10px;
+  flex:none;padding:calc(var(--safe-t) + 22px) 18px 10px;
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   transition:padding .2s var(--ease),box-shadow .2s;
 }
@@ -312,7 +312,7 @@ body.kb #tabs{transform:translateY(130%);}
 .push.in{transform:translateX(0);}
 .push-nav{
   flex:none;display:flex;align-items:center;gap:6px;
-  padding:calc(var(--safe-t) + 10px) 12px 12px;border-bottom:1px solid transparent;
+  padding:calc(var(--safe-t) + 18px) 12px 12px;border-bottom:1px solid transparent;
   transition:border-color .2s;
 }
 .push-nav.scrolled{border-bottom-color:var(--line);}
@@ -929,6 +929,10 @@ function openAccount(){
           el("button",{class:"sheet-primary", text:"Jetzt synchronisieren", onclick:()=>{ setSyncStatus("pending"); syncNow(); }}),
           el("button",{class:"sheet-cancel", text:"Abmelden", onclick:()=>{ logoutSync(false); draw(); }})
         );
+      }
+      if(typeof viewportInfo === "string" && viewportInfo){
+        wrap.append(el("div",{style:"margin-top:22px;font-size:11px;line-height:1.5;color:var(--faint)",
+          text:"Version " + ((document.querySelector('meta[name="app-version"]')||{}).content || "?") + " · " + viewportInfo}));
       }
       sc.appendChild(wrap);
       setSyncStatus(sync.status, sync.message);
@@ -1940,7 +1944,34 @@ function openFolder(f){
     draw();
     attachCollapse(sc, nav);
     return sc;
-  }, {title:f.name, action: el("button",{class:"iconbtn accent",html:I.plus,onclick:()=>openNote(newNote(f.id))})});
+  }, {title:f.name, action: el("div",{style:"display:flex;gap:2px"},[
+    el("button",{class:"iconbtn accent",html:I.plus,onclick:()=>openNote(newNote(f.id))}),
+    f.id ? el("button",{class:"iconbtn",html:I.more,onclick:()=>sheet({title:f.name, items:[
+      {label:"Umbenennen", icon:I.pen, onTap:()=>promptSheet("Ordner umbenennen", f.name, "Name", n=>{
+        f.name = n; f.updatedAt = Date.now(); save(); pop(); toast("Umbenannt");
+      })},
+      {label:"Ordner löschen", icon:I.trash, danger:true, onTap:()=>deleteFolderSheet(f)}
+    ]})}) : null
+  ])});
+}
+/* Ordner löschen: der Ordner samt Unterordnern verschwindet, die Notizen darin landen im Papierkorb
+   (von dort wiederherstellbar). Der Sync überträgt das Löschen wie am Desktop. */
+function folderAndDescendants(id){
+  const out = [id];
+  for(let i = 0; i < out.length; i++) store.folders.forEach(x => { if(x.parentId === out[i]) out.push(x.id); });
+  return out;
+}
+function deleteFolderSheet(f){
+  const ids = folderAndDescendants(f.id);
+  const notes = store.notes.filter(n => ids.includes(n.folderId));
+  const subs = ids.length - 1;
+  const what = [notes.length ? notes.length + (notes.length === 1 ? " Notiz" : " Notizen") + " in den Papierkorb" : "",
+                subs ? subs + (subs === 1 ? " Unterordner" : " Unterordner") + " mit" : ""].filter(Boolean).join(", ");
+  confirmSheet("„" + f.name + "“ löschen?" + (what ? " (" + what + ")" : ""), "Ordner löschen", ()=>{
+    notes.forEach(n => trashNote(n));
+    store.folders = store.folders.filter(x => !ids.includes(x.id));
+    save(); pop(); toast("Ordner gelöscht");
+  });
 }
 function openList(title, notes){
   push((scr, nav)=>{
@@ -2052,8 +2083,11 @@ function applyTheme(name){
   if(link) link.setAttribute("href", "data:image/svg+xml," + encodeURIComponent(stackIconSVG(t)));
   const dark = relLum(t.text) > relLum(t.bg);
   const ink = relLum(t.accent) > 0.35 ? (dark ? t.bg : t.text) : "#ffffff";
-  r.setProperty("--bg",t.bg); r.setProperty("--surface",t.surface);
-  r.setProperty("--surface-2",mixHex(t.surface, t.text, dark ? 0.07 : 0.04));
+  /* Auf hellen Paletten ist die Rohfarbe für Flächen fast weiß und springt als Kachel zu stark aus
+     dem Hintergrund — dort nur ein Drittel des Weges vom Hintergrund zur Flächenfarbe. */
+  const surface = dark ? t.surface : mixHex(t.bg, t.surface, 0.35);
+  r.setProperty("--bg",t.bg); r.setProperty("--surface",surface);
+  r.setProperty("--surface-2",mixHex(surface, t.text, dark ? 0.07 : 0.05));
   r.setProperty("--line",t.line); r.setProperty("--text",t.text);
   r.setProperty("--muted",mixHex(t.text, t.bg, dark ? 0.48 : 0.38));
   r.setProperty("--faint",mixHex(t.text, t.bg, dark ? 0.68 : 0.54));
@@ -2148,6 +2182,29 @@ document.addEventListener("touchend", e=>{
 }, {passive:false});
 
 showTab("aufgaben");
+
+/* Sichtbare Fläche nachmessen. Als Home-Bildschirm-App endet die Seite bei neueren iOS-Versionen
+   teils schon über der Home-Anzeige — dann wäre die eigene Reserve dafür doppelt und unten klaffte
+   ein Loch. Ist die Seite um so viel kürzer als der Bildschirm, entfällt die Reserve. Die Werte stehen
+   unter Konto & Sync, falls es auf einem Gerät doch nicht passt. */
+let viewportInfo = "";
+function measureViewport(){
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe), top = Math.round(parseFloat(cs.paddingTop) || 0), bottom = Math.round(parseFloat(cs.paddingBottom) || 0);
+  probe.remove();
+  const standalone = !!navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+  const gap = Math.round(screen.height - window.innerHeight);
+  const r = document.documentElement.style;
+  const bottomAlreadyExcluded = standalone && top > 0 && gap > 20 && gap < 120;
+  if(bottomAlreadyExcluded) r.setProperty("--safe-b", "0px"); else r.removeProperty("--safe-b");
+  viewportInfo = "Bildschirm " + screen.width + "×" + screen.height + " · Seite " + window.innerWidth + "×" + window.innerHeight +
+    " · oben " + top + " · unten " + bottom + (standalone ? " · Home-Bildschirm" : " · Browser") + (bottomAlreadyExcluded ? " · Reserve unten aus" : "");
+}
+measureViewport();
+window.addEventListener("resize", measureViewport);
+window.addEventListener("orientationchange", ()=> setTimeout(measureViewport, 300));
 
 /* Selbst-Aktualisierung: Als Home-Bildschirm-App bleibt die Seite im Speicher und GitHub Pages
    erlaubt 10 Minuten Cache — ein neuer Stand käme sonst erst nach Beenden der App an. Beim Öffnen und
