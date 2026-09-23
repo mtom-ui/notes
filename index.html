@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
+<meta name="app-version" content="3.2.3">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -2147,6 +2148,33 @@ document.addEventListener("touchend", e=>{
 }, {passive:false});
 
 showTab("aufgaben");
+
+/* Selbst-Aktualisierung: Als Home-Bildschirm-App bleibt die Seite im Speicher und GitHub Pages
+   erlaubt 10 Minuten Cache — ein neuer Stand käme sonst erst nach Beenden der App an. Beim Öffnen und
+   jedes Mal, wenn die App wieder in den Vordergrund kommt, wird die Version online (am Cache vorbei)
+   mit der eigenen verglichen; ist sie neuer, lädt die App neu — aber nie mitten im Schreiben. */
+(function(){
+  const mine = (document.querySelector('meta[name="app-version"]') || {}).content;
+  if(!mine || location.protocol === "file:") return;
+  let pending = false;
+  async function check(){
+    try{
+      const res = await fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" });
+      const m = /<meta name="app-version" content="([^"]+)"/.exec(await res.text());
+      if(m && m[1] !== mine) pending = true;
+    }catch(e){}
+    reloadIfIdle();
+  }
+  function reloadIfIdle(){
+    if(!pending || edNote || document.visibilityState !== "visible") return;
+    if(sessionStorage.getItem("reloadedFor") === mine) return;   // nie in eine Schleife laufen
+    sessionStorage.setItem("reloadedFor", mine);
+    location.replace(location.pathname + "?v=" + Date.now());   // Adresse mit Zeitstempel: am Cache vorbei
+  }
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") check(); });
+  window.addEventListener("popstate", ()=> setTimeout(reloadIfIdle, 400));   // nach dem Schließen einer Notiz
+  check();
+})();
 })();
 </script>
 </body>
