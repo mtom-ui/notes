@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.4.5">
+<meta name="app-version" content="3.5.1">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -362,6 +362,11 @@ body.kb #tabs{transform:translateY(130%);}
   border-top:1px solid var(--line);margin-top:1.5em;padding-top:1.4em;line-height:1.4;
 }
 .line-h2.line-title,.line-h3.line-title{border-top:none;margin-top:0;padding-top:0;}
+/* Pfad unter einer Überschrift: die übergeordneten Überschriften, winzig und blass — gerade am Handy,
+   wo es keine Gliederung an der Seite gibt. Pseudo-Element, damit es nicht Teil des Textes wird. */
+.line[data-path]::after{content:attr(data-path);display:block;font-size:10.5px;font-weight:500;font-style:normal;
+  letter-spacing:.02em;text-transform:none;line-height:1.4;color:var(--faint);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;-webkit-user-select:none;user-select:none;}
 .line-h1 .marker{color:var(--accent);opacity:.75;font-weight:600;}
 .line-h2 .marker,.line-h3 .marker,.line-h4 .marker{color:var(--accent);opacity:.75;}
 .line-quote{display:inline-block;width:100%;box-sizing:border-box;vertical-align:top;color:var(--muted);font-style:italic;border-left:3px solid var(--faint);padding-left:14px;}
@@ -1280,6 +1285,25 @@ function fullRebuild(lines){
   const state = {inCode:false};
   edEl.innerHTML = lines.map((l,i)=>renderLine(l,i,state)).join("\n");
 }
+/* Für jede Überschrift die Kette der übergeordneten (Zeile 0 ist der Notiztitel und zählt nicht mit,
+   Codeblöcke auch nicht). Läuft nach jedem Rendern über alle, weil eine geänderte Überschrift die Pfade
+   aller folgenden ändert. Gleiche Logik wie am Desktop. */
+function updateHeadingPaths(lines){
+  const stack = [];
+  let inCode = false;
+  lines.forEach((raw, i) => {
+    if(/^```/.test(raw)){ inCode = !inCode; return; }
+    if(inCode || i === 0) return;
+    const m = /^(#{1,6})\s+(.*)$/.exec(raw);
+    if(!m) return;
+    const level = m[1].length;
+    while(stack.length && stack[stack.length - 1].level >= level) stack.pop();
+    const path = stack.map(h => h.title).join("  ›  ");
+    const el = edEl.querySelector('.line[data-line="'+i+'"]');
+    if(el){ if(path) el.setAttribute("data-path", path); else el.removeAttribute("data-path"); }
+    stack.push({ level, title: m[2].replace(/[*_`]/g, "").trim() || "…" });
+  });
+}
 function renderInto(text){
   const lines = text.split("\n");
   let full = lines.length !== edPrev.length;
@@ -1287,7 +1311,7 @@ function renderInto(text){
     if(lines[i] === edPrev[i]) continue;
     if(/^```/.test(lines[i]) || /^```/.test(edPrev[i])){ full = true; break; }
   }
-  if(full){ fullRebuild(lines); edPrev = lines; return; }
+  if(full){ fullRebuild(lines); edPrev = lines; updateHeadingPaths(lines); return; }
   for(let i=0;i<lines.length;i++){
     if(lines[i] === edPrev[i]) continue;
     const tmp = document.createElement("div");
@@ -1296,6 +1320,7 @@ function renderInto(text){
     if(old) old.replaceWith(tmp.firstChild);
   }
   edPrev = lines;
+  updateHeadingPaths(lines);
 }
 
 /* ---- Cursor-Position als Zeichen-Offset (überlebt das Neu-Rendern) ---- */
