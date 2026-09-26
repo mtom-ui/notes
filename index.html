@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.4.0">
+<meta name="app-version" content="3.4.1">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -2089,10 +2089,9 @@ function applyTheme(name){
   if(link) link.setAttribute("href", "data:image/svg+xml," + encodeURIComponent(stackIconSVG(t)));
   const dark = relLum(t.text) > relLum(t.bg);
   const ink = relLum(t.accent) > 0.35 ? (dark ? t.bg : t.text) : "#ffffff";
-  /* Auf hellen Paletten ist die Rohfarbe für Flächen fast weiß und sprang als Kachel zu stark aus
-     dem Hintergrund; ein Drittel des Weges war dann zu wenig (Kacheln verschwammen mit dem Grund).
-     Drei Viertel: klar abgesetzt, aber nicht grell. */
-  const surface = dark ? t.surface : mixHex(t.bg, t.surface, 0.75);
+  /* Kacheln (Ordner, Notizen, Tickets) haben dieselbe Farbe wie der Hintergrund — abgegrenzt nur
+     durch die feine Linie. Ausdrücklicher Wunsch, gilt für alle Themes. */
+  const surface = t.bg;
   r.setProperty("--bg",t.bg); r.setProperty("--surface",surface);
   r.setProperty("--surface-2",mixHex(surface, t.text, dark ? 0.07 : 0.05));
   r.setProperty("--line",t.line); r.setProperty("--text",t.text);
