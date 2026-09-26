@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.5.2">
+<meta name="app-version" content="3.5.3">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -355,13 +355,15 @@ body.kb #tabs{transform:translateY(130%);}
    der Text im DOM bleibt unverändert — Cursor- und Offset-Rechnung merken
    davon nichts. */
 .line-title{display:inline-block;font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.2;}
-.line-h1{display:inline-block;font-size:23px;font-weight:600;letter-spacing:-.015em;line-height:1.3;margin-top:.6em;}
-.line-h2,.line-h3,.line-h4,.line-h5,.line-h6{
+.line-h1,.line-h2,.line-h3,.line-h4,.line-h5,.line-h6{
   display:inline-block;width:100%;box-sizing:border-box;
   font-size:13px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
   border-top:1px solid var(--line);margin-top:1.5em;padding-top:1.4em;line-height:1.4;
 }
-.line-h2.line-title,.line-h3.line-title{border-top:none;margin-top:0;padding-top:0;}
+.line-h1{font-size:15px;}
+.line-h1.line-title,.line-h2.line-title,.line-h3.line-title{border-top:none;margin-top:0;padding-top:0;}
+/* Der Notiztitel (erste Zeile) bleibt groß, auch wenn er mit # beginnt */
+.line-title[class*="line-h"]{font-size:30px;text-transform:none;letter-spacing:-.02em;color:var(--text);}
 /* Pfad unter einer Überschrift: die übergeordneten Überschriften, winzig und blass — gerade am Handy,
    wo es keine Gliederung an der Seite gibt. Pseudo-Element, damit es nicht Teil des Textes wird. */
 .line[data-path]::after{content:attr(data-path);display:block;font-size:10.5px;font-weight:500;font-style:normal;
