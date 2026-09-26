@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.4.1">
+<meta name="app-version" content="3.4.2">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -155,10 +155,10 @@ input,textarea{font:inherit;color:inherit;background:none;border:none;outline:no
 .section-head .h{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--text);}
 .section-head .sub{font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-top:5px;}
 .section-head .link{color:var(--accent);font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;font-weight:600;}
-.group{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;}
+/* Randlos: keine Kästen mehr, nur eine feine Linie unter jedem Eintrag — Text bündig mit den Überschriften. */
+.group{background:transparent;border:none;border-radius:0;overflow:hidden;}
+.card{background:var(--surface);border:none;border-bottom:1px solid var(--line);border-radius:0;padding:16px 0;}
 .card:active{background:var(--surface-2);}
-.card + .card{margin-top:12px;}
 .empty{color:var(--faint);font-size:14px;padding:20px;text-align:center;}
 .badge{
   font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:999px;
@@ -204,11 +204,11 @@ input,textarea{font:inherit;color:inherit;background:none;border:none;outline:no
 
 /* Listenzeilen */
 .rowwrap{position:relative;overflow:hidden;background:var(--signal);}
-.rowwrap + .rowwrap .row::before{
-  content:"";position:absolute;left:18px;right:0;top:0;height:1px;background:var(--line);
+.rowwrap .row::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);
 }
 .row{
-  position:relative;z-index:1;display:block;padding:16px 18px;background:var(--surface);
+  position:relative;z-index:1;display:block;padding:16px 0;background:var(--surface);
   transition:transform .22s var(--ease),background .12s;
 }
 .row.pressed{background:var(--surface-2);}
@@ -238,8 +238,7 @@ input,textarea{font:inherit;color:inherit;background:none;border:none;outline:no
 }
 
 /* Aufgaben (Checklisten-Zeilen aus dem Notiztext) */
-.task{display:flex;align-items:flex-start;gap:13px;padding:15px 18px;background:var(--surface);}
-.task + .task{box-shadow:inset 0 1px 0 var(--line);}
+.task{display:flex;align-items:flex-start;gap:13px;padding:15px 0;background:var(--surface);box-shadow:inset 0 -1px 0 var(--line);}
 .check{
   width:22px;height:22px;border-radius:50%;border:1.5px solid var(--faint);flex:none;margin-top:2px;
   display:flex;align-items:center;justify-content:center;transition:all .16s var(--ease);
