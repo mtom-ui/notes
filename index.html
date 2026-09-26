@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.2.4">
+<meta name="app-version" content="3.4.0">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -363,8 +363,8 @@ body.kb #tabs{transform:translateY(130%);}
   border-top:1px solid var(--line);margin-top:1.5em;padding-top:1.4em;line-height:1.4;
 }
 .line-h2.line-title,.line-h3.line-title{border-top:none;margin-top:0;padding-top:0;}
-.line-h1 .marker{color:var(--accent);opacity:.55;font-weight:600;}
-.line-h2 .marker,.line-h3 .marker,.line-h4 .marker{color:var(--accent);opacity:.6;}
+.line-h1 .marker{color:var(--accent);opacity:.75;font-weight:600;}
+.line-h2 .marker,.line-h3 .marker,.line-h4 .marker{color:var(--accent);opacity:.75;}
 .line-quote{display:inline-block;width:100%;box-sizing:border-box;vertical-align:top;color:var(--muted);font-style:italic;border-left:3px solid var(--faint);padding-left:14px;}
 .line-hr{display:inline-block;width:100%;color:transparent;background:linear-gradient(var(--line),var(--line)) center / 100% 1px no-repeat;}
 .line-code-fence{color:var(--faint);font-family:var(--mono);font-size:14.5px;}
@@ -372,9 +372,12 @@ body.kb #tabs{transform:translateY(130%);}
   box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:2px 8px;border-radius:6px;}
 .line-list{display:inline-block;padding-left:1.4em;}
 .line-list .marker{color:var(--accent);opacity:.75;}
+.line-bullet{padding-left:1.1em;text-indent:-1.1em;}
+.line-bullet>.marker{font-size:0;}
+.line-bullet::before{content:"•";display:inline-block;width:1.1em;text-indent:0;color:var(--accent);}
 .line-sub{margin-left:1.3em;}
 .line-sub .marker{color:var(--accent);opacity:.6;}
-.marker{color:var(--faint);font-weight:400;font-style:normal;}
+.marker{color:var(--muted);font-weight:400;font-style:normal;}
 /* font-size:0 statt display:none — die Zeichen bleiben für Cursor und Range im DOM */
 .marker-hide{font-size:0;}
 .line-cursor .marker-hide{font-size:inherit;}
@@ -1188,7 +1191,7 @@ function renderLine(raw, idx, state){
     return '<span class="line line-list line-checkbox'+(checked?" checked":"")+titleClass+'" data-line="'+idx+'"><span class="marker">'+escapeHtml(m[1])+'</span><span class="md-checkbox" data-line="'+idx+'">'+escapeHtml("["+m[2]+"]")+'</span>'+renderInline(m[3])+'</span>';
   }
   if((m = /^(\s*[-*]\s)(.*)$/.exec(raw)))
-    return '<span class="line line-list'+titleClass+'" data-line="'+idx+'"><span class="marker">'+escapeHtml(m[1])+'</span>'+renderInline(m[2])+'</span>';
+    return '<span class="line line-list line-bullet'+titleClass+'" data-line="'+idx+'"><span class="marker">'+escapeHtml(m[1])+'</span>'+renderInline(m[2])+'</span>';
   if((m = /^(\s*\d+\.\s)(.*)$/.exec(raw)))
     return '<span class="line line-list'+titleClass+'" data-line="'+idx+'"><span class="marker">'+escapeHtml(m[1])+'</span>'+renderInline(m[2])+'</span>';
   if((m = /^(\s+[ivxlcdm]+\.\s)(.*)$/.exec(raw)) && parseListLine(raw))
@@ -1475,7 +1478,8 @@ function openNote(note){
                         text: tDue(note) ? "fällig " + fmtDay(tDue(note)) : "+ Termin", onclick:()=>dueSheet(note, drawMeta)})
           ])
         : el("span",{text: folderName(note.folderId)}));
-      meta.appendChild(el("span",{class:"badge",text:noteStatus(),onclick:statusSheet,
+      // Status gibt es nur bei Tickets — eine Notiz ist einfach Text, ohne „Offen"/„TODO".
+      if(isTicket(note)) meta.appendChild(el("span",{class:"badge",text:noteStatus(),onclick:statusSheet,
         style:"margin-left:auto"}));
     }
     edOnChange = drawMeta;
@@ -1490,7 +1494,7 @@ function openNote(note){
     nav.querySelector(".back span:last-child").textContent = "Fertig";
     nav.lastChild.replaceWith(el("div",{style:"display:flex;gap:2px"},[
       el("button",{class:"iconbtn",html:I.more,onclick:()=>sheet({items:[
-        {label:"Status ändern", icon:I.board, onTap:statusSheet},
+        isTicket(note) ? {label:"Status ändern", icon:I.board, onTap:statusSheet} : null,
         isTicket(note) ? {label:"Termin", icon:I.check2, value: note.due ? fmtDay(note.due) : "keiner", onTap:()=>dueSheet(note, drawMeta)} : null,
         isTicket(note) ? {label:"Kürzel", icon:I.case, value: (note.tags||[]).join(" · ").toUpperCase() || "keins", onTap:()=>tagSheet(note, drawMeta)} : null,
         isTicket(note) ? null : {label:"In Ordner verschieben", icon:I.move, onTap:()=>moveSheet(note, drawMeta)},
@@ -2049,14 +2053,16 @@ function drawResults(sc){
 /* Dieselben Paletten wie am Desktop (notes.html, THEMES) — gleiche Rohfarben, gleiche
    Ableitung der gedämpften Töne, damit beide Apps bei gleicher Wahl gleich aussehen. */
 const THEMES = {
-  graphit:  {name:"Graphit",   bg:"#1a1917", surface:"#282520", line:"#3e382f", text:"#f3eada", accent:"#ff7a18", signal:"#ff3b5c"},
   fern:     {name:"Fern",      bg:"#254036", surface:"#2e4c40", line:"#3c5c4e", text:"#e4eedc", accent:"#dcee8a", signal:"#ff7a5a"},
-  nacht:    {name:"Nacht",     bg:"#16181d", surface:"#1f2229", line:"#333844", text:"#e7e9ee", accent:"#b9c6ff", signal:"#ff6b6b"},
-  salbei:   {name:"Salbei",    bg:"#d6e8d4", surface:"#edf5eb", line:"#aecbaa", text:"#243b26", accent:"#2e7d57", signal:"#c62d24"},
+  salbei:   {name:"Salbei",    bg:"#d6e8d4", surface:"#edf5eb", line:"#aecbaa", text:"#243b26", accent:"#195c3a", signal:"#c62d24"},
   flieder:  {name:"Flieder",   bg:"#e3d4ff", surface:"#f2eaff", line:"#c1a4f2", text:"#231145", accent:"#6a1bd1", signal:"#d11a3c"},
   mandarine:{name:"Mandarine", bg:"#fbdfc7", surface:"#fef0e5", line:"#efc19b", text:"#4a2a10", accent:"#1f4499", signal:"#d93a12"},
   sonne:    {name:"Sonne",     bg:"#fbebb5", surface:"#fef6df", line:"#e6d08a", text:"#3a2f0b", accent:"#2e4bc4", signal:"#c4271e"},
-  papier:   {name:"Papier",    bg:"#f6f3ec", surface:"#ffffff", line:"#e2dcd0", text:"#23211d", accent:"#3f6f4f", signal:"#c4382a"}
+  papier:   {name:"Papier",    bg:"#f6f3ec", surface:"#ffffff", line:"#e2dcd0", text:"#23211d", accent:"#3f6f4f", signal:"#c4382a"},
+  navy:       {name:"Navy",       bg:"#131a2b", surface:"#1c2440", line:"#303a5c", text:"#e9edf6", accent:"#7fa8e6", signal:"#ff6b5c"},
+  terrakotta: {name:"Terrakotta", bg:"#f5efe4", surface:"#fffaf1", line:"#e6d7c2", text:"#2c2118", accent:"#9c3a17", signal:"#c62d24"},
+  tiefsee:    {name:"Tiefsee",    bg:"#dcebe7", surface:"#eef7f4", line:"#b7d3cc", text:"#16302f", accent:"#155a68", signal:"#b83326"},
+  billabong:  {name:"Billabong",  bg:"#0f2b32", surface:"#16404a", line:"#2a5865", text:"#e3f3ef", accent:"#aed0c9", signal:"#ff8a6e"}
 };
 function relLum(hex){
   const c = [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=> v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4));
@@ -2083,14 +2089,15 @@ function applyTheme(name){
   if(link) link.setAttribute("href", "data:image/svg+xml," + encodeURIComponent(stackIconSVG(t)));
   const dark = relLum(t.text) > relLum(t.bg);
   const ink = relLum(t.accent) > 0.35 ? (dark ? t.bg : t.text) : "#ffffff";
-  /* Auf hellen Paletten ist die Rohfarbe für Flächen fast weiß und springt als Kachel zu stark aus
-     dem Hintergrund — dort nur ein Drittel des Weges vom Hintergrund zur Flächenfarbe. */
-  const surface = dark ? t.surface : mixHex(t.bg, t.surface, 0.35);
+  /* Auf hellen Paletten ist die Rohfarbe für Flächen fast weiß und sprang als Kachel zu stark aus
+     dem Hintergrund; ein Drittel des Weges war dann zu wenig (Kacheln verschwammen mit dem Grund).
+     Drei Viertel: klar abgesetzt, aber nicht grell. */
+  const surface = dark ? t.surface : mixHex(t.bg, t.surface, 0.75);
   r.setProperty("--bg",t.bg); r.setProperty("--surface",surface);
   r.setProperty("--surface-2",mixHex(surface, t.text, dark ? 0.07 : 0.05));
   r.setProperty("--line",t.line); r.setProperty("--text",t.text);
-  r.setProperty("--muted",mixHex(t.text, t.bg, dark ? 0.48 : 0.38));
-  r.setProperty("--faint",mixHex(t.text, t.bg, dark ? 0.68 : 0.54));
+  r.setProperty("--muted",mixHex(t.text, t.bg, dark ? 0.36 : 0.28));
+  r.setProperty("--faint",mixHex(t.text, t.bg, dark ? 0.56 : 0.44));
   r.setProperty("--accent",t.accent); r.setProperty("--accent-ink",ink); r.setProperty("--signal",t.signal);
   document.documentElement.style.colorScheme = dark ? "dark" : "light";
   const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.content = t.bg;
