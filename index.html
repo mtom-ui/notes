@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.5.4">
+<meta name="app-version" content="3.6.2">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" id="app-favicon" type="image/svg+xml" href="icons/icon-192.png">
@@ -333,6 +333,13 @@ body.kb #tabs{transform:translateY(130%);}
 
 /* Editor — Live-Markdown (wie in der Desktop-Quelle: die Syntax bleibt im
    Text stehen und wird nur in der Cursor-Zeile eingeblendet). */
+.note-searchbar{align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid var(--line);}
+.note-searchbar svg{width:17px;height:17px;color:var(--faint);flex:none;}
+.note-searchbar input{flex:1;min-width:0;font-size:15px;background:transparent;color:var(--ink);}
+.note-search-count{font-size:12px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.iconbtn.small{width:30px;height:30px;font-size:19px;}
+.search-hit{position:fixed;background:var(--accent);opacity:.22;border-radius:3px;pointer-events:none;z-index:40;}
+.search-hit.current{opacity:.48;}
 .ed-meta{
   padding:2px 18px 12px;display:flex;gap:8px;align-items:center;
   font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
@@ -386,6 +393,7 @@ body.kb #tabs{transform:translateY(130%);}
 .marker{color:var(--muted);font-weight:400;font-style:normal;}
 /* font-size:0 statt display:none — die Zeichen bleiben für Cursor und Range im DOM */
 .marker-hide{font-size:0;letter-spacing:0;}
+.md-url.marker-hide{font-size:0;}
 .line-cursor .marker-hide{font-size:inherit;}
 #editor strong{font-weight:700;}
 #editor em{font-style:italic;}
@@ -393,6 +401,13 @@ body.kb #tabs{transform:translateY(130%);}
 .md-code{font-family:var(--mono);font-size:14.5px;background:rgba(127,127,127,.14);padding:2px 6px;border-radius:5px;}
 .md-link{color:var(--accent);text-decoration:none;}
 .md-url{color:var(--faint);}
+.md-image-wrap{display:inline-flex;flex-direction:column;align-items:flex-start;max-width:100%;}
+.md-image{display:block;max-width:100%;max-height:60vh;border-radius:10px;margin:4px 0;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.md-caption{font-size:.78em;color:var(--faint);padding:0 2px 6px;max-width:100%;}
+.md-caption:empty::before{content:"+ Bildunterschrift";opacity:.6;}
+.md-image-pending{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;background:var(--surface);color:var(--muted);font-size:.85em;}
+.md-image-pending .spin{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--faint);border-top-color:var(--accent);animation:mdspin .7s linear infinite;}
+@keyframes mdspin{to{transform:rotate(360deg);}}
 .md-wikilink{color:var(--accent);}
 .md-wikilink.missing{color:var(--muted);text-decoration:underline dotted;}
 .md-tag{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border-radius:6px;padding:0 6px;}
@@ -1046,6 +1061,32 @@ function promptSheet(title, value, placeholder, onOk){
 function confirmSheet(title, label, onOk){
   sheet({title, items:[{label, icon:I.trash, danger:true, onTap:onOk}]});
 }
+// Wie promptSheet, aber "Sichern" mit leerem Feld ist erlaubt (entfernt die Bildunterschrift wieder).
+function captionSheet(value, onOk){
+  const input = el("input",{class:"sheet-input", value:value||"", placeholder:"Bildunterschrift"});
+  sheet({title:"Bildunterschrift", cancel:true, items:[
+    {custom: input},
+    {custom: el("button",{class:"sheet-primary",text:"Sichern",onclick:()=>{
+      const v = input.value.trim(); closeSheet(); setTimeout(()=>onOk(v),200);
+    }})}
+  ]});
+  setTimeout(()=>input.focus(), 320);
+}
+function editImageCaption(wrapEl, note){
+  const rawMd = wrapEl.dataset.md;
+  const m = /^!\[([^\]]*)\]\(([^)\s]*)(?:\s+"([^"]*)")?\)$/.exec(rawMd);
+  if(!m) return;
+  const [, alt, url, title] = m;
+  captionSheet(title || "", next=>{
+    const cleaned = next.replace(/"/g, "'");
+    const newMd = "![" + alt + "](" + url + (cleaned ? ' "' + cleaned + '"' : "") + ")";
+    const idx = note.text.indexOf(rawMd);
+    if(idx < 0) return;
+    const newText = note.text.slice(0, idx) + newMd + note.text.slice(idx + rawMd.length);
+    if(edNote === note) commitText(newText, idx + newMd.length);
+    else { note.text = newText; note.updatedAt = Date.now(); save(); }
+  });
+}
 
 /* ========================= 4. Navigation ========================= */
 const tabviews = { aufgaben:document.getElementById("tab-aufgaben"),
@@ -1153,6 +1194,8 @@ function swipeRow(wrap, inner, onDelete){
 const ZWS = "\u200b";
 const cleanText = s => s.replace(/\u200b/g, "");
 const escapeHtml = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const escAttr = s => escapeHtml(s).replace(/"/g,"&quot;");
+const unescapeHtmlEntities = s => s.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&amp;/g,"&");
 const TAG_RE = /(^|[\s(])#([\p{L}_][\p{L}\p{N}_\-\/]*)/gu;
 const findNoteByTitle = t => { const w = String(t).trim().toLowerCase(); return store.notes.find(n => titleOf(n).toLowerCase() === w) || store.tickets.find(n => titleOf(n).toLowerCase() === w); };
 
@@ -1166,6 +1209,20 @@ function renderInline(raw){
   t = t.replace(/\[\[([^\[\]\n]+?)\]\]/g, (m, title) => {
     const missing = !findNoteByTitle(title.replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">"));
     return put('<span class="marker marker-hide">[[</span><span class="md-wikilink'+(missing?" missing":"")+'">'+title+'</span><span class="marker marker-hide">]]</span>');
+  });
+  // Bild-Syntax vor der Link-Regel, sonst würde die "[alt](url)" aus "![alt](url)" herausgreifen.
+  // Die Bildunterschrift ist der Standard-Markdown-„Titel" (in Anführungszeichen) — Tippen aufs
+  // Bild fragt danach (editImageCaption weiter unten).
+  t = t.replace(/!\[([^\]]*)\]\(([^)\s]*)(?:\s+"([^"]*)")?\)/g, (m, alt, url, title) => {
+    const pending = /^img:[a-z0-9]+$/.test(url);
+    const rawMd = "![" + unescapeHtmlEntities(alt) + "](" + unescapeHtmlEntities(url) + (title !== undefined ? ' "' + unescapeHtmlEntities(title) + '"' : "") + ")";
+    const shown = pending
+      ? '<span class="md-image-pending"><i class="spin"></i>'+(alt || "Bild wird hochgeladen…")+'</span>'
+      : '<span class="md-image-wrap" data-md="'+escAttr(rawMd)+'"><img class="md-image" src="'+url+'" alt="'+alt+'" loading="lazy"><span class="md-caption">'+(title || '')+'</span></span>';
+    let hidden = '<span class="marker marker-hide">![</span><span class="marker md-url marker-hide">'+alt+'</span><span class="marker marker-hide">](</span><span class="md-url marker-hide">'+url+'</span>';
+    if(title !== undefined) hidden += '<span class="marker marker-hide"> "</span><span class="marker md-url marker-hide">'+title+'</span><span class="marker marker-hide">"</span>';
+    hidden += '<span class="marker marker-hide">)</span>';
+    return put(hidden + shown);
   });
   t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) =>
     put('<span class="marker marker-hide">[</span><a class="md-link" href="'+url+'" target="_blank" rel="noopener">'+txt+'</a><span class="marker marker-hide">](</span><span class="md-url marker-hide">'+url+'</span><span class="marker marker-hide">)</span>'));
@@ -1509,6 +1566,88 @@ function openNote(note){
         style:"margin-left:auto"}));
     }
     edOnChange = drawMeta;
+
+    /* In-Notiz-Suche — es gibt kein Cmd+F auf dem Handy. Hebt alle Treffer schwach hervor, den
+       aktuellen kraeftig, mit Overlay-Rechtecken ueber dem Text (wie Satzfokus am Desktop), statt
+       den Zeilen-Renderer anzufassen. Text aendert sich -> Suche laeuft automatisch neu. */
+    let searchOpen = false, searchQuery2 = "", searchHits = [], searchIdx = 0, searchHitEls = [];
+    function clearSearchHits(){ searchHitEls.forEach(function(m){ m.remove(); }); searchHitEls = []; }
+    function renderSearchHits(){
+      clearSearchHits();
+      searchHits.forEach(function(start, i){
+        const end = start + searchQuery2.length;
+        const a = locateOffset(ed, start), b = locateOffset(ed, end);
+        if(!a.found || !b.found) return;
+        const range = document.createRange();
+        range.setStart(a.node, a.nodeOffset); range.setEnd(b.node, b.nodeOffset);
+        [].slice.call(range.getClientRects()).forEach(function(r){
+          if(!r.width && !r.height) return;
+          const mark = el("div",{class:"search-hit"+(i===searchIdx?" current":"")});
+          mark.style.left=r.left+"px"; mark.style.top=r.top+"px"; mark.style.width=r.width+"px"; mark.style.height=r.height+"px";
+          document.body.appendChild(mark);
+          searchHitEls.push(mark);
+        });
+      });
+    }
+    function scrollToCurrentHit(){
+      if(!searchHits.length) return;
+      const a = locateOffset(ed, searchHits[searchIdx]);
+      const node = a.node && (a.node.nodeType === 3 ? a.node.parentElement : a.node);
+      const lineEl = node && node.closest && node.closest(".line");
+      if(lineEl) lineEl.scrollIntoView({ block:"center", behavior:"smooth" });
+    }
+    function updateSearchCount(){
+      searchCountEl.textContent = searchQuery2 ? (searchHits.length ? (searchIdx+1)+"/"+searchHits.length : "0/0") : "";
+    }
+    function runSearch(){
+      const text = cleanText(ed.textContent).toLowerCase(), needle = searchQuery2.toLowerCase();
+      searchHits = [];
+      if(needle){
+        let i = 0;
+        while(true){ const idx = text.indexOf(needle, i); if(idx < 0) break; searchHits.push(idx); i = idx + needle.length; }
+      }
+      searchIdx = 0;
+      updateSearchCount();
+      renderSearchHits();
+      scrollToCurrentHit();
+    }
+    function gotoHit(dir){
+      if(!searchHits.length) return;
+      searchIdx = (searchIdx + dir + searchHits.length) % searchHits.length;
+      updateSearchCount();
+      renderSearchHits();
+      scrollToCurrentHit();
+    }
+    function setSearchOpen(on){
+      searchOpen = on;
+      searchBarEl.style.display = on ? "flex" : "none";
+      if(on) setTimeout(function(){ searchInputEl.focus(); }, 200);
+      else { searchQuery2 = ""; searchInputEl.value = ""; searchHits = []; clearSearchHits(); }
+    }
+    const searchInputEl = el("input",{placeholder:"In dieser Notiz suchen…", autocomplete:"off"});
+    const searchCountEl = el("span",{class:"note-search-count"});
+    searchInputEl.addEventListener("input", function(){ searchQuery2 = searchInputEl.value; runSearch(); });
+    searchInputEl.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); gotoHit(e.shiftKey ? -1 : 1); }
+      else if(e.key === "Escape"){ e.preventDefault(); setSearchOpen(false); }
+    });
+    const searchBarEl = el("div",{class:"note-searchbar", style:"display:none"},[
+      el("span",{html:I.search}), searchInputEl, searchCountEl,
+      el("button",{class:"iconbtn small", text:"‹", onclick:function(){ gotoHit(-1); }}),
+      el("button",{class:"iconbtn small", text:"›", onclick:function(){ gotoHit(1); }}),
+      el("button",{class:"iconbtn small", text:"×", onclick:function(){ setSearchOpen(false); }})
+    ]);
+    // Positionen der Overlay-Rechtecke sind nur so lange richtig, bis gescrollt wird oder sich der
+    // Screen noch bewegt (Slide-Übergang beim Öffnen) — beides neu berechnen, ohne die Suche selbst
+    // neu laufen zu lassen.
+    let hitRaf = 0;
+    function scheduleRenderHits(){
+      if(!searchOpen || !searchHits.length || hitRaf) return;
+      hitRaf = requestAnimationFrame(function(){ hitRaf = 0; renderSearchHits(); });
+    }
+    ed.addEventListener("scroll", scheduleRenderHits, { passive:true });
+    const pushScreen = ed.closest(".push");
+    if(pushScreen) pushScreen.addEventListener("transitionend", scheduleRenderHits);
     function statusSheet(){
       sheet({title:"Status", items:STATUSES.map(k=>({
         label:k, icon: noteStatus()===k ? I.check : I.board,
@@ -1519,6 +1658,7 @@ function openNote(note){
     nav.querySelector(".title").textContent = isTicket(note) ? "Ticket" : "Notiz";
     nav.querySelector(".back span:last-child").textContent = "Fertig";
     nav.lastChild.replaceWith(el("div",{style:"display:flex;gap:2px"},[
+      el("button",{class:"iconbtn",html:I.search,onclick:()=>setSearchOpen(!searchOpen)}),
       el("button",{class:"iconbtn",html:I.more,onclick:()=>sheet({items:[
         isTicket(note) ? {label:"Status ändern", icon:I.board, onTap:statusSheet} : null,
         isTicket(note) ? {label:"Termin", icon:I.check2, value: note.due ? fmtDay(note.due) : "keiner", onTap:()=>dueSheet(note, drawMeta)} : null,
@@ -1536,12 +1676,13 @@ function openNote(note){
     ]));
 
     drawMeta();
-    scr.appendChild(el("div",{style:"flex:1;display:flex;flex-direction:column;min-height:0"},[meta, ed]));
+    scr.appendChild(el("div",{style:"flex:1;display:flex;flex-direction:column;min-height:0"},[searchBarEl, meta, ed]));
     renderInto(note.text || "");
 
     ed.addEventListener("input", ()=>{
       if(edNote !== note) return;
       commitText(cleanText(ed.textContent), getCaretOffset(ed));
+      if(searchOpen && searchQuery2) runSearch();
     });
     ed.addEventListener("keydown", e=>{
       if(e.isComposing) return;
@@ -1563,6 +1704,8 @@ function openNote(note){
       if(navigator.vibrate) navigator.vibrate(8);
     });
     ed.addEventListener("click", e=>{
+      const imgWrap = e.target.closest(".md-image-wrap");
+      if(imgWrap){ e.preventDefault(); editImageCaption(imgWrap, note); return; }
       const tag = e.target.closest(".md-tag");
       if(tag){
         e.preventDefault();
@@ -1627,6 +1770,7 @@ function openNote(note){
     if(!note.text) setTimeout(()=>{ ed.focus(); setCaretOffset(ed, 0); }, 380);
     ref.cleanup = ()=>{
       document.removeEventListener("selectionchange", onSel);
+      clearSearchHits();
       if(edEl === ed){ edEl = null; edNote = null; edOnChange = null; }
       // „+" getippt und ohne Eingabe wieder zu: nichts zurücklassen (der Sync räumt schon Hochgeladenes mit ab)
       const untouched = !String(note.text || "").trim() &&
