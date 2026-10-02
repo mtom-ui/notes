@@ -2981,7 +2981,8 @@ function drawResults(sc){
     return;
   }
   const notes = store.notes.filter(n=>!isTask(n) && n.text.toLowerCase().includes(q)).sort(byRecent);
-  const tickets = allTickets().filter(n=>n.text.toLowerCase().includes(q) || tTags(n).includes(q.replace(/^#/, ""))).sort(byRecent);
+  // Erledigte Tickets gehören ins Archiv, nicht in die Suche (wie am Desktop)
+  const tickets = allTickets().filter(n=>tStatus(n) !== "Erledigt" && (n.text.toLowerCase().includes(q) || tTags(n).includes(q.replace(/^#/, "")))).sort(byRecent);
   const tasks = allTasks().filter(t=>t.text.toLowerCase().includes(q));
   if(tickets.length){
     const g = el("div",{class:"group"});
