@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.58.1">
+<meta name="app-version" content="3.59.0">
 <link rel="manifest" href="manifest.json?v=3.58.1">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.58.1">
 <link rel="icon" id="app-favicon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=3.58.1">   <!-- schwarz-weißes App-Icon, bewusst nicht akzentgefärbt -->
@@ -86,50 +86,6 @@ input,textarea{font:inherit;color:inherit;background:none;border:none;outline:no
 
 /* ---------- Tab-Ebene ---------- */
 #tabviews{position:absolute;inset:0;bottom:0;}
-/* Sternenhimmel hinter der Begrüßung (animate-ui „Stars“): drei Ebenen, unterschiedlich schnell nach oben,
-   unten weich auslaufend. Dunkel = helle Sterne, Hell = feine graue Körner. Dezent; ist für heute alles
-   erledigt, wird er voll sichtbar (.done). Ohne Animation bei „Bewegung reduzieren“. */
-.st-stars{position:absolute;left:0;right:0;top:0;height:280px;overflow:hidden;pointer-events:none;z-index:0;opacity:.32;
-  --star:rgba(255,255,255,.9);-webkit-mask:linear-gradient(#000 35%,transparent);mask:linear-gradient(#000 35%,transparent);transition:opacity 1.4s ease;}
-.st-stars.light{--star:rgba(28,28,30,.55);opacity:.75;}
-.st-stars.light i:nth-child(1){width:1.6px;height:1.6px;} .st-stars.light i:nth-child(2){width:2.4px;height:2.4px;} .st-stars.light i:nth-child(3){width:3.2px;height:3.2px;}
-.st-stars.done{opacity:1;}
-.st-stars i{position:absolute;left:0;top:0;width:1px;height:1px;border-radius:50%;animation:starUp 140s linear infinite;}
-.st-stars i::after{content:"";position:absolute;top:500px;left:0;width:inherit;height:inherit;border-radius:inherit;box-shadow:inherit;}
-.st-stars i:nth-child(2){width:2px;height:2px;animation-duration:95s;}
-.st-stars i:nth-child(3){width:3px;height:3px;animation-duration:60s;opacity:.8;}
-@keyframes starUp{to{transform:translateY(-500px);}}
-@media (prefers-reduced-motion: reduce){.st-stars i{animation:none;}}
-#tab-start .scroll{position:relative;}
-#tab-start .scroll > :not(.st-stars){position:relative;z-index:1;}
-/* ---- Start (wie am Desktop): Begrüßung, Suche, drei Kennzahlen als Zeilen, Heute & überfällig, Zuletzt erstellt ---- */
-.st-hello{font-style:italic;}
-.st-q{display:flex;align-items:center;gap:9px;height:44px;margin:4px 18px 0;padding:0 16px;border-radius:999px;
-  background:color-mix(in srgb,var(--text) 8%,var(--bg));color:var(--muted);font-size:var(--fs-m);}
-.st-q svg{width:18px;height:18px;flex:none;}
-.st-kpis{margin:18px 18px 0;border-top:1px solid var(--line);}
-.st-kpi{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line);}
-.st-kpi .k{flex:1;min-width:0;}
-.st-kpi .lbl{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);}
-.st-kpi .num{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin-top:3px;font-variant-numeric:tabular-nums;}
-.st-kpi .num small{font-size:13px;font-weight:500;color:var(--faint);margin-left:4px;letter-spacing:0;}
-.st-kpi .sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
-.st-kpi .sub b{color:var(--text);font-weight:600;}
-.st-bars{display:grid;grid-template-columns:repeat(7,9px);gap:4px;align-items:end;height:36px;flex:none;}
-.st-bars i{position:relative;height:100%;border-radius:3px 3px 1px 1px;background:color-mix(in srgb,var(--text) 6%,transparent);overflow:hidden;}
-.st-bars i b{position:absolute;left:0;right:0;bottom:0;border-radius:3px 3px 1px 1px;background:color-mix(in srgb,var(--text) 42%,transparent);
-  transform-origin:bottom;animation:stGrow .6s var(--ease) both;animation-delay:calc(var(--i)*35ms + 120ms);}
-.st-bars i.today b{background:var(--accent);}
-@keyframes stGrow{from{transform:scaleY(0);}}
-.st-sec{display:flex;align-items:center;gap:10px;margin:26px 18px 6px;}
-.st-sec h2{margin:0;font-size:19px;font-weight:700;}
-.st-sec .more{margin-left:auto;font-size:13.5px;color:var(--faint);}
-.st-seg{margin:6px 18px 4px;}
-.st-in > *{animation:stRise .5s var(--ease) both;}
-.st-in > *:nth-child(2){animation-delay:.05s} .st-in > *:nth-child(3){animation-delay:.1s} .st-in > *:nth-child(4){animation-delay:.15s}
-.st-in > *:nth-child(5){animation-delay:.2s} .st-in > *:nth-child(n+6){animation-delay:.25s}
-@keyframes stRise{from{opacity:0;transform:translateY(8px);}}
-@media (prefers-reduced-motion: reduce){.st-in > *, .st-bars i b{animation:none;}}
 .tabview{
   position:absolute;inset:0;display:none;flex-direction:column;
   padding-bottom:calc(var(--tab-h) + var(--safe-b));
@@ -841,8 +797,7 @@ body.kb #tabs{transform:translateY(130%);}
 
 <div id="app">
   <div id="tabviews">
-    <section class="tabview on" id="tab-start"></section>
-    <section class="tabview" id="tab-aufgaben"></section>
+    <section class="tabview on" id="tab-aufgaben"></section>
     <section class="tabview" id="tab-notizen"></section>
   </div>
 
@@ -2220,18 +2175,17 @@ function editImageCaption(wrapEl, note){
 }
 
 /* ========================= 4. Navigation ========================= */
-const tabviews = { start:document.getElementById("tab-start"), aufgaben:document.getElementById("tab-aufgaben"),
+const tabviews = { aufgaben:document.getElementById("tab-aufgaben"),
                    notizen:document.getElementById("tab-notizen") };
 const TABS = [
-  {id:"start", label:"Start", icon:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19v-8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 20.5V15h5v5.5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>'},
   {id:"aufgaben", label:"Tickets", icon:I.check2},
   {id:"notizen", label:"Notizen", icon:I.notes}
 ];
 const tabbar = document.getElementById("tabs");
 /* Das „+" sitzt mittig in der Leiste (statt als schwebender Knopf darüber) —
-   die vier Tabs verteilen sich links und rechts davon. */
+   die zwei Tabs (Tickets, Notizen) stehen links und rechts davon. */
 TABS.forEach((t, i) => {
-  if(i === 2){
+  if(i === 1){
     tabbar.appendChild(el("button",{class:"plus", "aria-label":"Neu", onclick:()=>{
       haptic(8);
       openNote(curTab === "aufgaben" ? newTicket() : newNote());   // im Tickets-Tab ein Ticket, sonst eine Notiz
@@ -2241,7 +2195,7 @@ TABS.forEach((t, i) => {
     [el("span",{html:t.icon}), el("span",{text:t.label})]));
 });
 
-let curTab = "start";
+let curTab = "aufgaben";
 const renderers = {};
 function showTab(id){
   const swap = () => {
@@ -4890,76 +4844,6 @@ function dayHeading(key){
 let taskGroup = "";          // "" = alle Gruppen
 let showDone = false;
 
-/* Start-Tab: wie die Startseite am Desktop — Begrüßung je nach Uhrzeit, Suche, drei Kennzahlen mit Balken der
-   letzten 7 Tage (heute in Akzentfarbe), „Heute & überfällig" mit Gruppenfilter (Tipp öffnet das Ticket) und die
-   zuletzt erstellten Notizen. „Geschrieben" zählt hier die Wörter neu angelegter Notizen (das Handy speichert
-   keine Textversionen wie der Mac). */
-let startGroup = "", startAnim = true;
-// Sterne: einmal zufällig verteilt (bleiben zwischen den Neuzeichnungen gleich), drei Ebenen
-const STAR_LAYERS = [260, 80, 30].map(n => Array.from({length:n}, () => Math.round(Math.random() * 2400) + "px " + Math.round(Math.random() * 500) + "px var(--star)").join(","));
-function starsHtml(light, done){ return '<div class="st-stars' + (light ? " light" : "") + (done ? " done" : "") + '">' + STAR_LAYERS.map(s => '<i style="box-shadow:' + s + '"></i>').join("") + '</div>'; }
-
-renderers.start = function(){
-  const v = tabviews.start; v.innerHTML = "";
-  const today = dayKey(), h = new Date().getHours();
-  const days = [6,5,4,3,2,1,0].map(k => shiftDay(today, -k));
-  const live = allTickets(), open = live.filter(n => tStatus(n) !== "Erledigt");
-  const over = open.filter(n => tDue(n) && tDue(n) < today), dueNow = open.filter(n => tDue(n) === today);
-  const doneOn = d => live.filter(n => tStatus(n) === "Erledigt" && (n.doneAt || "") === d).length;
-  const doneVals = days.map(doneOn), doneSum = doneVals.reduce((a,b)=>a+b,0);
-  const prevSum = days.map(d => doneOn(shiftDay(d, -7))).reduce((a,b)=>a+b,0), diff = doneSum - prevSum;
-  const openVals = days.map(d => live.filter(n => dayKey(new Date(n.createdAt || 0)) <= d && !(tStatus(n) === "Erledigt" && n.doneAt && n.doneAt <= d)).length);
-  const words = t => (String(t||"").match(/[\p{L}\p{N}]+/gu) || []).length;
-  const newNotes = store.notes.filter(n => !isTask(n) && n.createdAt && dayKey(new Date(n.createdAt)) >= days[0]);
-  const wVals = days.map(d => newNotes.filter(n => dayKey(new Date(n.createdAt)) === d).reduce((a,n)=>a+words(n.text),0));
-  const wSum = wVals.reduce((a,b)=>a+b,0);
-  const email = sync.session && sync.session.email;
-  const name = (store.ui && store.ui.displayName) || (email ? email.split("@")[0].split(/[._-]/).pop() : "");
-  const hello = (h < 11 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend") + (name ? ", " + name.charAt(0).toUpperCase() + name.slice(1) : "");
-  const dueN = over.length + dueNow.length;
-  const bars = vals => { const max = Math.max(...vals, 1);
-    return el("div",{class:"st-bars", html: vals.map((x, i) => '<i' + (i === 6 ? ' class="today"' : '') + '><b style="--i:' + i + ';height:' + (x ? Math.max(8, x / max * 100) : 0) + '%"></b></i>').join("")}); };
-  const fmt = n => n.toLocaleString("de-DE");
-  const subEl = el("div",{class:"sub"});
-  subEl.innerHTML = esc(new Date().toLocaleDateString("de-DE",{weekday:"long", day:"numeric", month:"long"})) + " · " +
-    (dueN ? dueN + " heute dran" + (over.length ? ', <span style="color:var(--signal)">' + over.length + " überfällig</span>" : "") : "nichts fällig");
-  const nav = el("div",{class:"nav"},[ el("div",{},[subEl, el("h1",{class:"st-hello",text:hello})]),
-    el("div",{class:"nav-actions"},[syncDotBtn(), el("button",{class:"iconbtn",html:I.gear,onclick:settingsSheet})]) ]);
-  const sc = el("div",{class:"scroll" + (startAnim ? " st-in" : "")});
-  startAnim = false;
-  v.append(nav, sc); attachCollapse(sc, nav);
-  sc.insertAdjacentHTML("afterbegin", starsHtml(currentColorMode() === "light", dueN === 0));
-  sc.appendChild(el("div",{class:"st-q", onclick:openSearch},[el("span",{html:I.search}), el("span",{text:"Suchen"})]));
-  const kpi = (lbl, num, unit, sub, vals, onTap) => el("div",{class:"st-kpi", onclick:onTap},[
-    el("div",{class:"k"},[el("div",{class:"lbl",text:lbl}), el("div",{class:"num",html: esc(num) + (unit ? '<small>' + esc(unit) + '</small>' : '')}), el("div",{class:"sub",html:sub})]), bars(vals)]);
-  sc.appendChild(el("div",{class:"st-kpis"},[
-    kpi("Offene Tickets", fmt(open.length), "", (over.length ? over.length + " überfällig · " : "") + dueNow.length + " heute", openVals, ()=>showTab("aufgaben")),
-    kpi("Geschrieben · 7 Tage", fmt(wSum), "Wörter", "in " + newNotes.length + (newNotes.length === 1 ? " neuen Notiz" : " neuen Notizen"), wVals, ()=>showTab("notizen")),
-    kpi("Erledigt · 7 Tage", fmt(doneSum), "", diff ? "<b>" + (diff > 0 ? "↑ " : "↓ ") + Math.abs(diff) + "</b> gegenüber der Woche davor" : "so viele wie die Woche davor", doneVals, ()=>{ showDone = true; showTab("aufgaben"); })
-  ]));
-  // Heute & überfällig mit Gruppenfilter
-  sc.appendChild(el("div",{class:"st-sec"},[el("h2",{text:"Heute & überfällig"})]));
-  const seg = el("div",{class:"seg st-seg","data-ptrack":"stgroup"});
-  [{id:"", name:"Alle"}].concat(TAG_GROUPS).forEach(g => seg.appendChild(el("button",{class: startGroup === g.id ? "on" : "", onclick:()=>{ startGroup = g.id; renderers.start(); }},[el("span",{text:g.name})])));
-  sc.appendChild(seg);
-  const inG = n => !startGroup || inTicketGroup(n, startGroup);
-  const ov = over.filter(inG).sort((a,b) => tDue(a).localeCompare(tDue(b))), nw = dueNow.filter(inG);
-  const list = el("div",{class:"section"});
-  if(!ov.length && !nw.length) list.appendChild(el("div",{class:"empty",text: startGroup ? "In dieser Gruppe ist heute nichts dran." : "Alles erledigt — schönen Feierabend."}));
-  [["Überfällig", ov, true], ["Heute", nw, false]].forEach(([t, arr, sig]) => {
-    if(!arr.length) return;
-    list.appendChild(el("div",{class:"tgroup", style: sig ? "color:var(--signal)" : ""},[el("span",{text:t}), el("span",{class:"c",text:String(arr.length)})]));
-    const g = el("div",{class:"group"}); arr.forEach(n => g.appendChild(taskNoteRow(n, ()=>renderers.start()))); list.appendChild(g);
-  });
-  sc.appendChild(list);
-  // Zuletzt erstellt
-  sc.appendChild(el("div",{class:"st-sec"},[el("h2",{text:"Zuletzt erstellt"}), el("span",{class:"more",text:"Alle ›",onclick:()=>showTab("notizen")})]));
-  const recent = store.notes.filter(n => !isTask(n) && (n.text||"").trim()).sort((a,b) => (b.createdAt||0) - (a.createdAt||0)).slice(0, 5);
-  const ng = el("div",{class:"group", style:"margin:0 18px"}); recent.forEach(n => ng.appendChild(noteRow(n, ()=>renderers.start())));
-  sc.appendChild(ng);
-  requestAnimationFrame(()=>syncPill("stgroup", seg));
-};
-
 renderers.aufgaben = function(){
   const v = tabviews.aufgaben; v.innerHTML = "";
   const nav = el("div",{class:"nav"},[
@@ -5615,8 +5499,6 @@ function accentWave(){
     { duration: 540, delay: Math.max(0, top) / innerHeight * 360, easing: "cubic-bezier(.34,1.56,.64,1)" }));
 }
 function applyTheme(){
-  // Sternenhimmel der Startseite wechselt mit (sonst blieben z. B. weiße Sterne auf weißem Grund stehen)
-  document.querySelectorAll(".st-stars").forEach(x => x.classList.toggle("light", currentColorMode() === "light"));
   const mode = currentColorMode(), accent = currentAccent();
   const t = Object.assign({ accent }, GRAYSCALE[mode]), r = document.documentElement.style, dark = mode === "dark";
   /* Kacheln (Ordner, Notizen, Tickets) haben dieselbe Farbe wie der Hintergrund — abgegrenzt nur
@@ -5782,7 +5664,7 @@ document.addEventListener("touchend", e=>{
 renderers.aufgaben = withFlip(renderers.aufgaben, ()=> tabviews.aufgaben, "[data-k]");
 renderers.notizen = withFlip(renderers.notizen, ()=> tabviews.notizen, "[data-k]");
 drawResults = withFlip(drawResults, sc => sc, "[data-k]");
-showTab("start");
+showTab("aufgaben");
 
 /* Sichtbare Fläche nachmessen. Als Home-Bildschirm-App endet die Seite bei neueren iOS-Versionen
    teils schon über der Home-Anzeige — dann wäre die eigene Reserve dafür doppelt und unten klaffte
