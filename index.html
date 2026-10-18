@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.59.0">
+<meta name="app-version" content="3.59.1">
 <link rel="manifest" href="manifest.json?v=3.58.1">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.58.1">
 <link rel="icon" id="app-favicon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=3.58.1">   <!-- schwarz-weißes App-Icon, bewusst nicht akzentgefärbt -->
@@ -5684,9 +5684,13 @@ function measureViewport(){
      aber trotzdem von der Seitenhöhe ab (gemessen: Bildschirm 956, Seite 894, oben 62). Die Seite endet
      dann 62pt über dem Bildschirmrand, darunter klafft ein leerer Streifen. Abhilfe: die App selbst auf
      volle Bildschirmhöhe strecken; der Abstand zur Home-Anzeige (unten) bleibt dabei erhalten. */
-  const stretched = standalone && top > 0 && Math.abs(gap - top) <= 4;
+  /* Als Web-Clip aus dem Konfigurationsprofil fehlt unten noch mehr (Statusleiste + Home-Anzeige) — daher
+     jede Lücke im Hochformat schließen. Meldet iOS dann unten keinen Abstand, die Reserve für die
+     Home-Anzeige selbst setzen (nur bei Geräten mit Notch/Dynamic Island, erkennbar an top > 20). */
+  const portrait = window.innerHeight > window.innerWidth;   // screen.* dreht unter iOS nicht mit
+  const stretched = standalone && portrait && top > 0 && gap > 4;
   if(stretched) r.setProperty("--app-h", screen.height + "px"); else r.removeProperty("--app-h");
-  r.removeProperty("--safe-b");
+  if(stretched && bottom === 0 && top > 20) r.setProperty("--safe-b", "34px"); else r.removeProperty("--safe-b");
   viewportInfo = "Bildschirm " + screen.width + "×" + screen.height + " · Seite " + window.innerWidth + "×" + window.innerHeight +
     " · oben " + top + " · unten " + bottom + (standalone ? " · Home-Bildschirm" : " · Browser") + (stretched ? " · auf Bildschirmhöhe gestreckt" : "");
 }
