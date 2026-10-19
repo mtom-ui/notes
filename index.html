@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.59.1">
+<meta name="app-version" content="3.60.0">
 <link rel="manifest" href="manifest.json?v=3.58.1">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.58.1">
 <link rel="icon" id="app-favicon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=3.58.1">   <!-- schwarz-weißes App-Icon, bewusst nicht akzentgefärbt -->
@@ -471,6 +471,20 @@ body.kb #tabs{transform:translateY(130%);}
 .line-quote.line-info.ib-warn::before{content:"!";background:var(--signal);color:#fff;font-family:var(--sans);font-style:normal;}
 .line-quote.line-info.ib-tip{background:color-mix(in srgb,#3d9a5e 15%,transparent);border-left-color:#3d9a5e;}
 .line-quote.line-info.ib-tip::before{content:"★";background:#3d9a5e;color:#fff;font-family:var(--sans);font-style:normal;font-size:var(--fs-xs);}
+/* Kopier-Box „> [!copy] Text": neutraler Kasten, aufeinanderfolgende Zeilen bilden einen Block; der Knopf oben
+   rechts (nur in der ersten Zeile) kopiert den ganzen Block ohne Markierungen in die Zwischenablage. */
+.line-quote.line-info.ib-copy{ background: color-mix(in srgb, var(--text) 7%, transparent); border-left-color: var(--faint); padding-left: 16px; padding-right: 48px; }
+.line-quote.line-info.ib-copy::before{ display:none; }   /* kein Symbol links — der Knopf rechts reicht */
+.line-quote.line-info.ib-copy + .ib-copy{ margin-top: 0; border-top-right-radius: 0; padding-top: 0; }
+.line-quote.line-info.ib-copy:has(+ .ib-copy){ margin-bottom: 0; border-bottom-right-radius: 0; padding-bottom: 2px; }
+.ib-copy + .ib-copy .copy-btn{ display:none; }
+.copy-btn{ position:absolute; right:7px; top:5px; width:30px; height:30px; border-radius:8px; cursor:pointer;
+  -webkit-user-select:none; user-select:none; transition: background .15s, transform .15s; }
+.copy-btn::after{ content:""; position:absolute; inset:0; background: var(--muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='11' height='11' rx='2.5'/%3E%3Cpath d='M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15'/%3E%3C/svg%3E") center / 17px no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='11' height='11' rx='2.5'/%3E%3Cpath d='M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15'/%3E%3C/svg%3E") center / 17px no-repeat; }
+.copy-btn:hover{ background: color-mix(in srgb, var(--text) 9%, transparent); }
+.copy-btn:active{ transform: scale(.9); }
+.copy-btn.done::after{ background: var(--accent); -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"); animation: copyPop .35s cubic-bezier(.34,1.56,.64,1); }
+@keyframes copyPop{ from{ transform: scale(.4); opacity:0; } }
 .line-quote{display:inline-block;width:100%;box-sizing:border-box;vertical-align:top;color:var(--muted);font-style:italic;border-left:3px solid var(--faint);padding-left:14px;}
 .line-hr{display:inline-block;width:100%;color:transparent;background:linear-gradient(var(--line),var(--line)) center / 100% 1px no-repeat;}
 /* Stil (wie iA Writer): Syntax farbig, Stilprüfung grau durchgestrichen */
@@ -3242,6 +3256,7 @@ const SLASH_CMDS = [
   { id:"info",    label:"Infobox",            zeichen:"i",  md:"[!info]",  worte:"hinweis callout notiz",     art:"zeile", text:"> [!info] " },
   { id:"warnung", label:"Warnung",            zeichen:"!",  md:"[!warning]", worte:"achtung vorsicht callout risiko", art:"zeile", text:"> [!warning] " },
   { id:"tipp",    label:"Tipp",               zeichen:"★",  md:"[!tip]",   worte:"hinweis idee callout",      art:"zeile", text:"> [!tip] " },
+  { id:"copy",    label:"Kopier-Box",         zeichen:"⧉",  md:"[!copy]",  worte:"kopieren zwischenablage textfeld clipboard", art:"zeile", text:"> [!copy] " },
   { id:"link",    label:"Link",               zeichen:"↗",  md:"[ ]( )",   worte:"url verweis adresse",       art:"link" },
   { id:"verweis", label:"Notiz verlinken",    zeichen:"[[", md:"[[ ]]",    worte:"wikilink notiz verweis",    art:"text", text:"[[", caret:2 },
   { id:"tabelle", label:"Tabelle",            zeichen:"▦",  md:"| |",      worte:"table spalten",             art:"block", text:"| Spalte 1 | Spalte 2 |\n| --- | --- |\n|  |  |\n", caret:2 },
@@ -3562,10 +3577,27 @@ function linkEinfuegen(at){
     commitText(text.slice(0, at) + md + text.slice(at), at + md.length);
   }, () => { ed.focus(); setCaretOffset(ed, at); });
 }
+/* Kopier-Box: den ganzen Block (aufeinanderfolgende „> [!copy]"-Zeilen um Zeile idx) ohne Markierungen */
+function copyBlockText(text, idx){
+  const L = text.split("\n"), re = /^>\s?\[!(copy|kopie|kopieren)\]\s?/i;
+  let a = idx, b = idx;
+  while(a > 0 && re.test(L[a - 1])) a--;
+  while(b < L.length - 1 && re.test(L[b + 1])) b++;
+  return L.slice(a, b + 1).map(l => l.replace(re, "")).join("\n");
+}
+async function copyToClipboard(s){
+  try{ await navigator.clipboard.writeText(s); return true; }
+  catch(e){
+    const ta = document.createElement("textarea"); ta.value = s; ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;"; document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand("copy"); }catch(_){}
+    ta.remove(); return ok;
+  }
+}
 /* Schnellbefehl: „/info " am Zeilenanfang wird zur Infobox „> [!info] " */
 function expandSlash(text, offset){
   const ls = text.lastIndexOf("\n", offset - 1) + 1;
-  const rep = { "/info ":"> [!info] ", "/warnung ":"> [!warning] ", "/tipp ":"> [!tip] " }[text.slice(ls, offset)];
+  const rep = { "/info ":"> [!info] ", "/warnung ":"> [!warning] ", "/tipp ":"> [!tip] ", "/copy ":"> [!copy] ", "/kopieren ":"> [!copy] " }[text.slice(ls, offset)];
   if(!rep) return null;
   return { text: text.slice(0, ls) + rep + text.slice(offset), offset: ls + rep.length };
 }
@@ -3749,8 +3781,8 @@ function renderLine(raw, idx, state){
   if(state.tw && state.tw[idx]) return renderTableLine(raw, idx, state.tw[idx], titleClass);
   if((m = /^(#{1,6})(\s+)(.*)$/.exec(raw)))
     return '<span class="line line-h'+m[1].length+titleClass+'" data-line="'+idx+'"><span class="marker marker-hide">'+escapeHtml(m[1]+m[2])+'</span>'+renderInline(m[3])+'</span>';
-  if((m = /^(>\s?\[!(info|warning|warnung|tip|tipp)\]\s?)(.*)$/i.exec(raw)))   // Infobox „> [!info] Text", Warnung [!warning], Tipp [!tip]
-    return '<span class="line line-quote line-info'+({ warning:" ib-warn", warnung:" ib-warn", tip:" ib-tip", tipp:" ib-tip" }[m[2].toLowerCase()] || "")+titleClass+'" data-line="'+idx+'"><span class="marker marker-hide">'+escapeHtml(m[1])+'</span>'+renderInline(m[3])+'</span>';
+  if((m = /^(>\s?\[!(info|warning|warnung|tip|tipp|copy|kopie|kopieren)\]\s?)(.*)$/i.exec(raw)))   // Infobox „> [!info] Text", Warnung [!warning], Tipp [!tip], Kopier-Box [!copy]
+    return '<span class="line line-quote line-info'+({ warning:" ib-warn", warnung:" ib-warn", tip:" ib-tip", tipp:" ib-tip", copy:" ib-copy", kopie:" ib-copy", kopieren:" ib-copy" }[m[2].toLowerCase()] || "")+titleClass+'" data-line="'+idx+'"><span class="marker marker-hide">'+escapeHtml(m[1])+'</span>'+(/^(copy|kopie|kopieren)$/i.test(m[2]) ? '<span class="copy-btn" contenteditable="false" data-copy="'+idx+'" title="Alles kopieren"></span>' : "")+renderInline(m[3])+'</span>';
   if((m = /^>(\s?)(.*)$/.exec(raw)))
     return '<span class="line line-quote'+titleClass+'" data-line="'+idx+'"><span class="marker marker-hide">'+escapeHtml(">"+m[1])+'</span>'+renderInline(m[2])+'</span>';
   if((m = /^(\s*[-*]\s)\[([ xX])\](\s.*)$/.exec(raw))){
@@ -4101,12 +4133,12 @@ function handleEnter(){
   const line = lines[pos.line];
   const li = start === end && !inCodeBeforeLine(lines, pos.line) ? parseListLine(line) : null;   // im Code: keine Liste
   // Infobox/Warnung/Tipp: Enter mitten im Text teilt in zwei Boxen gleicher Art, Enter in einer leeren Box beendet
-  // sie (wie bei Listen), am Ende geht es mit einer normalen Zeile weiter.
+  // sie (wie bei Listen), am Ende geht es mit einer normalen Zeile weiter — außer in der Kopier-Box (bleibt ein Block).
   const bm = start === end && !inCodeBeforeLine(lines, pos.line) ? /^>\s?\[![a-z]+\]\s?/i.exec(line) : null;
   if(bm && pos.col >= bm[0].length){
     const nl = lines.slice();
     if(!line.slice(bm[0].length).trim()){ nl[pos.line] = ""; commitLines(nl, pos.line, 0); return; }
-    if(pos.col < line.length){ nl.splice(pos.line, 1, line.slice(0, pos.col), bm[0] + line.slice(pos.col)); commitLines(nl, pos.line + 1, bm[0].length); return; }
+    if(pos.col < line.length || /\[!(copy|kopie|kopieren)\]/i.test(bm[0])){ nl.splice(pos.line, 1, line.slice(0, pos.col), bm[0] + line.slice(pos.col)); commitLines(nl, pos.line + 1, bm[0].length); return; }   // Kopier-Box: auch am Ende weiter im Block
   }
   if(!li || pos.col < li.marker.length){ insertTextAtCaret("\n"); return; }
   const newLines = lines.slice();
@@ -4672,6 +4704,15 @@ function openNote(note){
       const ln = ed.querySelector('.line[data-line="' + idx + '"]');   // Haken wischt ein, Kreis pulsiert
       if(ln){ ln.classList.add("just"); setTimeout(()=>ln.classList.remove("just"), 450); }
       haptic(8);
+    });
+    /* Kopier-Box: Tipp auf den Knopf kopiert den ganzen Block (pointerdown verhindert, dass der Cursor springt) */
+    ed.addEventListener("pointerdown", e=>{ if(e.target.closest(".copy-btn")) e.preventDefault(); });
+    ed.addEventListener("click", async e=>{
+      const btn = e.target.closest(".copy-btn"); if(!btn) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const ok = await copyToClipboard(copyBlockText(note.text, parseInt(btn.dataset.copy, 10)));
+      haptic(8); toast(ok ? "Kopiert" : "Kopieren nicht möglich");
+      if(ok){ btn.classList.add("done"); setTimeout(()=>btn.classList.remove("done"), 1400); }
     });
     ed.addEventListener("click", e=>{
       const imgWrap = e.target.closest(".md-image-wrap");
