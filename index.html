@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.60.1">
+<meta name="app-version" content="3.61.0">
 <link rel="manifest" href="manifest.json?v=3.58.1">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.58.1">
 <link rel="icon" id="app-favicon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=3.58.1">   <!-- schwarz-weißes App-Icon, bewusst nicht akzentgefärbt -->
@@ -4126,7 +4126,7 @@ function markerBackspace(text, start){
   if(li && li.indent) return "outdent";
   return { text: text.slice(0, ls) + line.slice(marker.length) + text.slice(end), offset: ls };
 }
-function handleEnter(){
+function handleEnter(soft){   // soft = Shift+Enter: in einer Box neue Zeile in derselben Box (auch leer), sonst schlichter Umbruch
   const {start, end} = getSelectionOffsets(edEl);
   const lines = cleanText(edEl.textContent).split("\n");
   const pos = lineIndexAndColAt(lines, lineStartsOf(lines), start);
@@ -4137,10 +4137,11 @@ function handleEnter(){
   const bm = start === end && !inCodeBeforeLine(lines, pos.line) ? /^>\s?\[![a-z]+\]\s?/i.exec(line) : null;
   if(bm && pos.col >= bm[0].length){
     const nl = lines.slice();
+    if(soft){ nl.splice(pos.line, 1, line.slice(0, pos.col), bm[0] + line.slice(pos.col)); commitLines(nl, pos.line + 1, bm[0].length); return; }
     if(!line.slice(bm[0].length).trim()){ nl[pos.line] = ""; commitLines(nl, pos.line, 0); return; }
     if(pos.col < line.length || /\[!(copy|kopie|kopieren)\]/i.test(bm[0])){ nl.splice(pos.line, 1, line.slice(0, pos.col), bm[0] + line.slice(pos.col)); commitLines(nl, pos.line + 1, bm[0].length); return; }   // Kopier-Box: auch am Ende weiter im Block
   }
-  if(!li || pos.col < li.marker.length){ insertTextAtCaret("\n"); return; }
+  if(soft || !li || pos.col < li.marker.length){ insertTextAtCaret("\n"); return; }
   const newLines = lines.slice();
   if(li.content.trim() === ""){
     const parent = parentListItem(lines, pos.line, li.indent.length);
@@ -4667,7 +4668,7 @@ function openNote(note){
     const feel = edFeel = writerFeel(ed, edWrap, scroller);
     ed.addEventListener("keydown", e=>{
       if(e.isComposing) return;
-      if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); handleEnter(); return; }
+      if(e.key === "Enter"){ e.preventDefault(); handleEnter(e.shiftKey); return; }   // Shift+Enter (Hardware-Tastatur): Zeile in der Box
       if(e.key === "Tab"){ e.preventDefault(); indentLines(e.shiftKey); }
     });
     /* Software-Tastaturen melden Enter oft nur als beforeinput. */
