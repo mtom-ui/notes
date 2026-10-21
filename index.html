@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#22392f">
 <meta name="apple-mobile-web-app-title" content="Notes">
-<meta name="app-version" content="3.61.0">
+<meta name="app-version" content="3.61.1">
 <link rel="manifest" href="manifest.json?v=3.58.1">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.58.1">
 <link rel="icon" id="app-favicon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=3.58.1">   <!-- schwarz-weißes App-Icon, bewusst nicht akzentgefärbt -->
@@ -3577,6 +3577,15 @@ function linkEinfuegen(at){
     commitText(text.slice(0, at) + md + text.slice(at), at + md.length);
   }, () => { ed.focus(); setCaretOffset(ed, at); });
 }
+/* Einfügen in eine Box (Kopier-, Info-, Warn-, Tipp-Box): jede eingefügte Zeile bekommt die Markierung der Box,
+   sonst landete ab der zweiten Zeile alles als normaler Text unter der Box. null = keine Box oder nur eine Zeile. */
+function boxPasteText(all, start, text){
+  if(!text.includes("\n")) return null;
+  const ls = all.lastIndexOf("\n", start - 1) + 1, m = /^>\s?\[![a-z]+\]\s?/i.exec(all.slice(ls, start));
+  if(!m) return null;
+  const marker = /\s$/.test(m[0]) ? m[0] : m[0] + " ";
+  return text.replace(/\n+$/, "").split("\n").map((l, i) => i ? marker + l : l).join("\n");
+}
 /* Kopier-Box: den ganzen Block (aufeinanderfolgende „> [!copy]"-Zeilen um Zeile idx) ohne Markierungen */
 function copyBlockText(text, idx){
   const L = text.split("\n"), re = /^>\s?\[!(copy|kopie|kopieren)\]\s?/i;
@@ -4653,7 +4662,8 @@ function openNote(note){
         const md = "[" + picked + "](" + linkNorm(clean.trim()) + ")";
         commitText(cur.slice(0, start) + md + cur.slice(end), start + md.length); return;
       }
-      commitText(cur.slice(0, start) + clean + cur.slice(end), start + clean.length);
+      const ins = boxPasteText(cur, start, clean) || clean;   // in einer Box: jede Zeile bleibt in der Box
+      commitText(cur.slice(0, start) + ins + cur.slice(end), start + ins.length);
     });
     ed.addEventListener("input", e=>{
       if(edNote !== note) return;
